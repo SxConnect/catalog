@@ -48,12 +48,17 @@ class FilesystemStorage(StorageBackend):
 class S3Storage(StorageBackend):
     def __init__(self, bucket: str, endpoint: Optional[str] = None):
         self.bucket = bucket
+        
+        # Garantir que endpoint tem protocolo
+        if endpoint and not endpoint.startswith(('http://', 'https://')):
+            endpoint = f'https://{endpoint}'
+        
         self.s3_client = boto3.client(
             's3',
             endpoint_url=endpoint,
             aws_access_key_id=settings.s3_access_key,
             aws_secret_access_key=settings.s3_secret_key,
-            region_name=settings.s3_region
+            region_name=getattr(settings, 's3_region', 'us-east-1')
         )
     
     def save(self, file_data: bytes, path: str) -> str:
@@ -99,9 +104,10 @@ class StorageService:
         storage_type = getattr(settings, 'storage_type', 'filesystem')
         
         if storage_type == 's3' or storage_type == 'minio':
+            endpoint = getattr(settings, 's3_endpoint', None)
             self.backend = S3Storage(
                 bucket=settings.s3_bucket,
-                endpoint=getattr(settings, 's3_endpoint', None)
+                endpoint=endpoint
             )
         else:
             self.backend = FilesystemStorage(settings.storage_path)
@@ -123,5 +129,14 @@ class StorageService:
     def delete_image(self, path: str) -> bool:
         return self.backend.delete(path)
 
-# Singleton
-storage_service = StorageService()
+# Singleton - inicializa apenas quando usado
+_storage_service = None
+
+def get_storage_service():
+    global _storage_service
+    if _storage_service is None:
+        _storage_service = StorageService()
+    return _storage_service
+
+# Para compatibilidade com código existente
+storage_service = get_storage_service()

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     storage_path: str = "/app/storage"
     
     # S3/MinIO Configuration
-    s3_endpoint: Optional[str] = None  # For MinIO: http://minio:9000
+    s3_endpoint: Optional[str] = None  # For MinIO: https://minio-s3.sxconnect.com.br
     s3_bucket: str = "sixpet-catalog"
     s3_access_key: Optional[str] = None
     s3_secret_key: Optional[str] = None
