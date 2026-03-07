@@ -31,33 +31,6 @@ services:
       timeout: 5s
       retries: 5
 
-  minio:
-    image: minio/minio:latest
-    container_name: sixpet-catalog-minio
-    restart: always
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    volumes:
-      - minio_data:/data
-    networks:
-      - portainer_default
-    labels:
-      - traefik.enable=true
-      # MinIO API
-      - traefik.http.routers.minio-api.rule=Host(`minio-api.catalog.sxconnect.com.br`)
-      - traefik.http.routers.minio-api.entrypoints=websecure
-      - traefik.http.routers.minio-api.tls.certresolver=leresolver
-      - traefik.http.routers.minio-api.service=minio-api
-      - traefik.http.services.minio-api.loadbalancer.server.port=9000
-      # MinIO Console
-      - traefik.http.routers.minio-console.rule=Host(`minio.catalog.sxconnect.com.br`)
-      - traefik.http.routers.minio-console.entrypoints=websecure
-      - traefik.http.routers.minio-console.tls.certresolver=leresolver
-      - traefik.http.routers.minio-console.service=minio-console
-      - traefik.http.services.minio-console.loadbalancer.server.port=9001
-
   api:
     image: ghcr.io/sxconnect/catalog:latest
     container_name: sixpet-catalog-api
@@ -66,12 +39,12 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-sixpet}:${POSTGRES_PASSWORD:-sixpet123}@postgres:5432/${POSTGRES_DB:-sixpet_catalog}
       - REDIS_URL=redis://redis:6379/0
       - GROQ_API_KEYS=${GROQ_API_KEYS}
-      - STORAGE_TYPE=${STORAGE_TYPE:-minio}
-      - S3_ENDPOINT=http://minio:9000
+      - STORAGE_TYPE=minio
+      - S3_ENDPOINT=${MINIO_S3_DOMAIN:-http://minio:9000}
       - S3_BUCKET=${S3_BUCKET:-sixpet-catalog}
-      - S3_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
-      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
-      - S3_PUBLIC_URL=https://minio-api.catalog.sxconnect.com.br
+      - S3_ACCESS_KEY=${MINIO_ROOT_USER:-admin}
+      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - S3_PUBLIC_URL=https://${MINIO_S3_DOMAIN:-minio-s3.sxconnect.com.br}
     volumes:
       - catalog_storage:/app/storage
     depends_on:
@@ -102,12 +75,12 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-sixpet}:${POSTGRES_PASSWORD:-sixpet123}@postgres:5432/${POSTGRES_DB:-sixpet_catalog}
       - REDIS_URL=redis://redis:6379/0
       - GROQ_API_KEYS=${GROQ_API_KEYS}
-      - STORAGE_TYPE=${STORAGE_TYPE:-minio}
-      - S3_ENDPOINT=http://minio:9000
+      - STORAGE_TYPE=minio
+      - S3_ENDPOINT=${MINIO_S3_DOMAIN:-http://minio:9000}
       - S3_BUCKET=${S3_BUCKET:-sixpet-catalog}
-      - S3_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
-      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
-      - S3_PUBLIC_URL=https://minio-api.catalog.sxconnect.com.br
+      - S3_ACCESS_KEY=${MINIO_ROOT_USER:-admin}
+      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - S3_PUBLIC_URL=https://${MINIO_S3_DOMAIN:-minio-s3.sxconnect.com.br}
     volumes:
       - catalog_storage:/app/storage
     depends_on:
@@ -120,7 +93,6 @@ services:
 
 volumes:
   postgres_data:
-  minio_data:
   catalog_storage:
 
 networks:
