@@ -51,6 +51,6 @@ frontend/.env.local
 frontend/.env.production.local
 frontend/.env.development.local
 frontend/.env.test.local
-frontend/package-lock.json
+# package-lock.json is needed for Docker build
 frontend/yarn.lock
 frontend/pnpm-lock.yaml
