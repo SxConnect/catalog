@@ -15,8 +15,17 @@ export default function RootLayout({
 }: Readonly<{
     children: React.ReactNode;
 }>) {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://catalog-api.sxconnect.com.br";
+
     return (
         <html lang="pt-BR">
+            <head>
+                <script
+                    dangerouslySetInnerHTML={{
+                        __html: `window.__API_URL__ = "${apiUrl}";`,
+                    }}
+                />
+            </head>
             <body className={inter.className}>
                 <Providers>{children}</Providers>
             </body>
