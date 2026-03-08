@@ -25,6 +25,45 @@ def list_api_keys(db: Session = Depends(get_db)):
     keys = db.query(ApiKey).all()
     return keys
 
+@router.post("/api-keys")
+def create_api_key(
+    key: str,
+    provider: str = "groq",
+    daily_limit: int = 14400,
+    db: Session = Depends(get_db)
+):
+    """Cria uma nova API key"""
+    # Verificar se já existe
+    existing = db.query(ApiKey).filter(ApiKey.key == key).first()
+    if existing:
+        return {"error": "API key already exists", "id": existing.id}
+    
+    # Criar nova
+    api_key = ApiKey(
+        key=key,
+        provider=provider,
+        daily_limit=daily_limit,
+        used_today=0,
+        status=True
+    )
+    db.add(api_key)
+    db.commit()
+    db.refresh(api_key)
+    
+    return api_key
+
+@router.delete("/api-keys/{key_id}")
+def delete_api_key(key_id: int, db: Session = Depends(get_db)):
+    """Remove uma API key"""
+    api_key = db.query(ApiKey).filter(ApiKey.id == key_id).first()
+    if not api_key:
+        return {"error": "API key not found"}
+    
+    db.delete(api_key)
+    db.commit()
+    
+    return {"message": "API key deleted successfully"}
+
 @router.get("/queue/status")
 def queue_status():
     return {"message": "Queue status endpoint"}

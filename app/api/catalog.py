@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Catalog
@@ -27,6 +27,21 @@ async def upload_catalog(file: UploadFile = File(...), db: Session = Depends(get
     process_pdf_task.delay(catalog.id, str(file_path))
     
     return {"catalog_id": catalog.id, "status": "processing"}
+
+@router.get("/list")
+def list_catalogs(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, le=100),
+    db: Session = Depends(get_db)
+):
+    """Lista todos os catálogos"""
+    catalogs = db.query(Catalog).offset(skip).limit(limit).all()
+    total = db.query(Catalog).count()
+    
+    return {
+        "total": total,
+        "catalogs": catalogs
+    }
 
 @router.get("/{catalog_id}")
 def get_catalog(catalog_id: int, db: Session = Depends(get_db)):
