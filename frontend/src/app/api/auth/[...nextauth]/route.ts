@@ -2,12 +2,12 @@ import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 
-// Usuários hardcoded (em produção, buscar do banco)
+// Usuários configurados via variáveis de ambiente
 const users = [
     {
         id: "1",
-        email: process.env.ADMIN_EMAIL || "admin@sixpet.com",
-        password: bcrypt.hashSync(process.env.ADMIN_PASSWORD || "admin123", 10),
+        email: process.env.ADMIN_EMAIL,
+        password: process.env.ADMIN_PASSWORD ? bcrypt.hashSync(process.env.ADMIN_PASSWORD, 10) : null,
         name: "Admin",
         role: "admin",
     },
@@ -28,8 +28,8 @@ const authOptions: NextAuthOptions = {
 
                 const user = users.find((u) => u.email === credentials.email);
 
-                if (!user) {
-                    return null;
+                if (!user || !user.password) {
+                    throw new Error("Credenciais de admin não configuradas. Configure ADMIN_EMAIL e ADMIN_PASSWORD.");
                 }
 
                 const isValid = await bcrypt.compare(
