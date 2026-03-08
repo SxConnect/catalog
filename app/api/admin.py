@@ -28,3 +28,69 @@ def list_api_keys(db: Session = Depends(get_db)):
 @router.get("/queue/status")
 def queue_status():
     return {"message": "Queue status endpoint"}
+
+from app.models import Settings
+from pydantic import BaseModel
+from typing import Optional
+
+class SettingsUpdate(BaseModel):
+    groq_api_keys: str
+    extractions_per_second: int = 10
+    scraping_url: Optional[str] = None
+    scraping_enabled: bool = False
+    max_concurrent_catalogs: int = 4
+    enable_deduplication: bool = True
+    similarity_threshold: float = 0.85
+
+@router.get("/settings")
+def get_settings(db: Session = Depends(get_db)):
+    """Retorna todas as configurações do sistema"""
+    settings_dict = {}
+    
+    # Valores padrão
+    defaults = {
+        "groq_api_keys": "",
+        "extractions_per_second": 10,
+        "scraping_url": "",
+        "scraping_enabled": False,
+        "max_concurrent_catalogs": 4,
+        "enable_deduplication": True,
+        "similarity_threshold": 0.85,
+    }
+    
+    # Buscar do banco
+    settings = db.query(Settings).all()
+    for setting in settings:
+        settings_dict[setting.key] = setting.get_typed_value()
+    
+    # Mesclar com defaults
+    return {**defaults, **settings_dict}
+
+@router.put("/settings")
+def update_settings(data: SettingsUpdate, db: Session = Depends(get_db)):
+    """Atualiza as configurações do sistema"""
+    settings_data = {
+        "groq_api_keys": ("string", data.groq_api_keys),
+        "extractions_per_second": ("int", str(data.extractions_per_second)),
+        "scraping_url": ("string", data.scraping_url or ""),
+        "scraping_enabled": ("bool", str(data.scraping_enabled)),
+        "max_concurrent_catalogs": ("int", str(data.max_concurrent_catalogs)),
+        "enable_deduplication": ("bool", str(data.enable_deduplication)),
+        "similarity_threshold": ("float", str(data.similarity_threshold)),
+    }
+    
+    for key, (value_type, value) in settings_data.items():
+        setting = db.query(Settings).filter(Settings.key == key).first()
+        if setting:
+            setting.value = value
+            setting.value_type = value_type
+        else:
+            setting = Settings(
+                key=key,
+                value=value,
+                value_type=value_type
+            )
+            db.add(setting)
+    
+    db.commit()
+    return {"message": "Settings updated successfully"}

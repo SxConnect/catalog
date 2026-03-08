@@ -1,218 +1,222 @@
-# 🔧 Troubleshooting - Erros Comuns
+# 🔧 Troubleshooting - SixPet Catalog
 
-## ❌ Erro: password authentication failed for user "sixpet_catalog_user"
+## ❌ Erro: password authentication failed for user
+
+```
+FATAL: password authentication failed for user "sixpet_catalog_user"
+```
 
 ### Causa
-As variáveis de ambiente do PostgreSQL não estão corretas ou não estão sendo lidas.
+As variáveis de ambiente do PostgreSQL não estão corretas.
 
 ### Solução
 
-#### 1. Verificar Variáveis no Portainer
-
-No Portainer, ao editar a stack, certifique-se que as variáveis estão assim:
+No Portainer, verifique as variáveis de ambiente:
 
 ```env
+# ❌ ERRADO
+POSTGRES_USER=sixpet_catalog_user
+
+# ✅ CORRETO
 POSTGRES_USER=sixpet
-POSTGRES_PASSWORD=SuaSenhaForte123!
+```
+
+**Variáveis corretas:**
+```env
+POSTGRES_USER=sixpet
+POSTGRES_PASSWORD=9gKoJrI57Duf
 POSTGRES_DB=sixpet_catalog
 ```
 
-**IMPORTANTE:** O usuário deve ser `sixpet`, NÃO `sixpet_catalog_user`
+### Como Corrigir
 
-#### 2. Verificar DATABASE_URL
-
-A `DATABASE_URL` é construída automaticamente no docker-compose:
-
-```yaml
-DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-```
-
-Deve resultar em:
-```
-postgresql://sixpet:SuaSenha123!@postgres:5432/sixpet_catalog
-```
-
-#### 3. Recriar Banco (se necessário)
-
-Se o banco já foi criado com usuário errado:
-
-```bash
-# Parar stack
-docker-compose -f docker-compose.prod.yml down
-
-# Remover volume do postgres
-docker volume rm catalog_postgres_data
-
-# Subir novamente
-docker-compose -f docker-compose.prod.yml up -d
-```
-
-#### 4. Verificar Dentro do Container
-
-```bash
-# Entrar no container da API
-docker exec -it sixpet-catalog-api bash
-
-# Ver variáveis
-echo $DATABASE_URL
-echo $POSTGRES_USER
-echo $POSTGRES_PASSWORD
-
-# Testar conexão
-psql $DATABASE_URL -c "SELECT 1"
-```
+1. Portainer > Stacks > catalog > **Editor**
+2. Scroll até **Environment variables**
+3. Corrigir:
+   - `POSTGRES_USER` → `sixpet`
+   - `POSTGRES_DB` → `sixpet_catalog`
+4. **Update the stack**
 
 ---
 
-## ❌ Erro: Invalid endpoint: minio-s3.sxconnect.com.br
+## ❌ Erro: Invalid endpoint MinIO
+
+```
+ValueError: Invalid endpoint: minio-s3.sxconnect.com.br
+```
 
 ### Causa
-Endpoint do MinIO sem protocolo `https://`
+Endpoint sem protocolo `https://`
 
 ### Solução
 
-Certifique-se que no Portainer você tem:
+Aguarde o build da nova imagem no GitHub Actions (já corrigido no código).
 
-```env
-MINIO_S3_DOMAIN=minio-s3.sxconnect.com.br
-```
-
-O código adiciona `https://` automaticamente. Se ainda der erro, force:
-
+Ou adicione manualmente no `.env`:
 ```env
 S3_ENDPOINT=https://minio-s3.sxconnect.com.br
 ```
 
 ---
 
-## ❌ Erro: Container não inicia
+## ❌ Container não inicia
 
-### Verificar Logs
-
+### Verificar logs
 ```bash
-docker logs sixpet-catalog-api --tail 100
-docker logs sixpet-catalog-postgres --tail 100
+-catalog-api -f
+docker logs sixpet-catalog-worker -f
+docker logs sixpet-catalog-postgres -f
 ```
 
-### Verificar Health Checks
-
+### Verificar variáveis
 ```bash
-docker ps --filter "name=sixpet-catalog"
+docker exec sixpet-catalog-api env | grep -E "DATABASE|MINIO|S3"
 ```
-
-Se STATUS mostrar `unhealthy`, veja os logs.
 
 ---
 
-## ❌ Erro: Bucket não encontrado
+## ❌ PostgreSQL não conecta
 
-### Criar Bucket no MinIO
-
+### Verificar se está rodando
 ```bash
-# Via CLI
-mc alias set myminio https://minio-s3.sxconnect.com.br admin i7uDSxH$smwp
-mc mb myminio/sixpet-catalog
-mc anonymous set download myminio/sixpet-catalog
-```
-
-### Via Console Web
-
-1. https://minio.sxconnect.com.br
-2. Buckets > Create Bucket
-3. Nome: `sixpet-catalog`
-4. Access Policy: Public
-
----
-
-## ✅ Checklist de Deploy
-
-Antes de fazer deploy, verifique:
-
-- [ ] GitHub Actions build passou (✅ verde)
-- [ ] Variáveis de ambiente corretas no Portainer
-- [ ] PostgreSQL: `POSTGRES_USER=sixpet`
-- [ ] MinIO: Bucket `sixpet-catalog` criado
-- [ ] MinIO: Credenciais corretas
-- [ ] Groq: API keys válidas
-- [ ] Network: `portainer_default` existe
-
----
-
-## 🔍 Debug Completo
-
-### 1. Verificar Imagem
-
-```bash
-docker pull ghcr.io/sxconnect/catalog:latest
-docker images | grep catalog
-```
-
-### 2. Verificar Network
-
-```bash
-docker network ls | grep portainer
-docker network inspect portainer_default
-```
-
-### 3. Verificar Volumes
-
-```bash
-docker volume ls | grep catalog
-```
-
-### 4. Testar Conexões
-
-```bash
-# PostgreSQL
+docker ps | grep postgres
 docker exec sixpet-catalog-postgres pg_isready -U sixpet
-
-# Redis
-docker exec sixpet-catalog-redis redis-cli ping
-
-# MinIO (de dentro do container API)
-docker exec -it sixpet-catalog-api bash
-curl https://minio-s3.sxconnect.com.br
 ```
 
-### 5. Verificar Variáveis
-
+### Testar conexão
 ```bash
-docker exec sixpet-catalog-api env | grep -E "DATABASE|REDIS|S3|MINIO|GROQ"
+docker exec sixpet-catalog-postgres psql -U sixpet -d sixpet_catalog -c "SELECT 1"
+```
+
+### Recriar banco (se necessário)
+```bash
+# Parar stack
+docker-compose -f docker-compose.prod.yml down
+
+# Remover volume
+docker volume rm catalog_postgres_data
+
+# Subir novamente
+docker-compose -f docker-compose.prod.yml up -d
 ```
 
 ---
 
-## 📝 Variáveis Corretas (Exemplo)
+## ❌ MinIO não conecta
+
+### Verificar credenciais
+```bash
+# Testar com mc
+mc alias set test https://minio-s3.sxconnect.com.br admin i7uDSxH$smwp
+mc ls test/
+```
+
+### Verificar bucket
+```bash
+mc ls test/sixpet-catalog
+# Se não existir, criar:
+mc mb test/sixpet-catalog
+mc anonymous set download test/sixpet-catalog
+```
+
+---
+
+## ❌ Worker não processa
+
+### Verificar Redis
+```bash
+docker exec sixpet-catalog-redis redis-cli ping
+# Deve retornar: PONG
+```
+
+### Ver fila
+```bash
+docker exec sixpet-catalog-redis redis-cli LLEN celery
+```
+
+### Restart worker
+```bash
+docker restart sixpet-catalog-worker
+docker logs sixpet-catalog-worker -f
+```
+
+---
+
+## ❌ API retorna 500
+
+### Ver logs detalhados
+```bash
+docker logs sixpet-catalog-api -f --tail 100
+```
+
+### Testar health
+```bash
+curl https://catalog-api.sxconnect.com.br/health
+```
+
+### Entrar no container
+```bash
+docker exec -it sixpet-catalog-api bash
+
+# Testar imports
+python -c "from app.main import app; print('OK')"
+
+# Testar DB
+python -c "from app.database import engine; print(engine.url)"
+```
+
+---
+
+## ✅ Checklist de Variáveis
+
+Certifique-se que tem TODAS estas variáveis no Portainer:
 
 ```env
-# Database
+# PostgreSQL
 POSTGRES_USER=sixpet
-POSTGRES_PASSWORD=MinhaSenhaForte123!
+POSTGRES_PASSWORD=9gKoJrI57Duf
 POSTGRES_DB=sixpet_catalog
 
 # MinIO
 MINIO_S3_DOMAIN=minio-s3.sxconnect.com.br
 MINIO_ROOT_USER=admin
 MINIO_ROOT_PASSWORD=i7uDSxH$smwp
-S3_BUCKET=sixpet-catalog
+3_BUCKET=sixpet-catalog
 
 # Groq
-GROQ_API_KEYS=gsk_abc123,gsk_def456
+GROQ_API_KEYS=gsk_key1,gsk_key2,gsk_key3
 ```
 
 ---
 
-## 🆘 Ainda com Problemas?
+## 🔄 Restart Completo
 
-1. Copie os logs completos:
-   ```bash
-   docker logs sixpet-catalog-api > api-logs.txt
-   docker logs sixpet-catalog-postgres > postgres-logs.txt
-   ```
+Se nada funcionar, restart completo:
 
-2. Verifique as variáveis:
-   ```bash
-   docker exec sixpet-catalog-api env > env-vars.txt
-   ```
+```bash
+# Parar tudo
+docker-compose -f docker-compose.prod.yml down
 
-3. Abra issue no GitHub com os arquivos anexados
+# Limpar (CUIDADO: apaga dados!)
+docker volume rm catalog_postgres_data
+
+# Subir novamente
+docker-compose -f docker-compose.prod.yml up -d
+
+# Aguardar containers ficarem healthy
+docker ps
+
+# Ver logs
+docker logs sixpet-catalog-api -f
+```
+
+---
+
+## 📞 Suporte
+
+Se o problema persistir:
+
+docker logs sixpet-catalog-api > logs.txt`
+2. Abra issue: https://github.com/SxConnect/catalog/issues
+3. Cole os logs e descreva o problema
+1. Copie os logs: `
