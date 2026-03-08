@@ -4,8 +4,8 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'frontend/**'
-      - '.github/workflows/docker-publish-frontend.yml'
+      - 'catalog/frontend/**'
+      - 'catalog/.github/workflows/docker-publish-frontend.yml'
   workflow_dispatch:
 
 env:
@@ -47,7 +47,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./frontend
+          context: ./catalog/frontend
+          file: ./catalog/frontend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
