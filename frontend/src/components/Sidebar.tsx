@@ -23,7 +23,7 @@ export default function Sidebar() {
 
     return (
         <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
-            <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white border-r border-gray-200 px-6 pb-4">
+            <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-card border-r border-border px-6 pb-4">
                 <div className="flex h-16 shrink-0 items-center">
                     <h1 className="text-2xl font-bold text-primary-600">SixPet</h1>
                 </div>
@@ -38,15 +38,15 @@ export default function Sidebar() {
                                             <Link
                                                 href={item.href}
                                                 className={`
-                          group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold
+                          group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-colors
                           ${isActive
-                                                        ? "bg-primary-50 text-primary-600"
-                                                        : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
+                                                        ? "bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400"
+                                                        : "text-foreground/70 hover:text-primary-600 hover:bg-background"
                                                     }
                         `}
                                             >
                                                 <item.icon
-                                                    className={`h-6 w-6 shrink-0 ${isActive ? "text-primary-600" : "text-gray-400 group-hover:text-primary-600"
+                                                    className={`h-6 w-6 shrink-0 ${isActive ? "text-primary-600 dark:text-primary-400" : "text-foreground/40 group-hover:text-primary-600"
                                                         }`}
                                                 />
                                                 {item.name}
