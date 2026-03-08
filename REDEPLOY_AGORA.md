@@ -1,15 +1,22 @@
 # 🚀 REDEPLOY AGORA - Instruções Diretas
 
 ## Status Atual
-✅ Commit `40245ea` enviado para GitHub
+✅ Commit `573147a` enviado para GitHub
 ⏳ Build do GitHub Actions em andamento
 ⏳ Aguardando imagens no GHCR
 
 ## O Que Foi Corrigido
 
-1. **CORS** - Agora aceita requisições do frontend
+1. **CORS** - Agora aceita requisições do frontend com todos os headers
 2. **API Keys** - Endpoint aceita JSON corretamente
-3. **Headers** - Todos os headers necessários configurados
+3. **Sidebar** - Tema dark aplicado corretamente
+4. **Next.js RSC** - Desabilitado para evitar erro 404 em rotas
+
+## Commits Aplicados
+
+- `40245ea` - CORS e endpoint de API keys
+- `f327720` - Documentação
+- `573147a` - Sidebar dark mode e Next.js config
 
 ## Passo a Passo para Redeploy
 
