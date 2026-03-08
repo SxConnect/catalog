@@ -25,24 +25,29 @@ def list_api_keys(db: Session = Depends(get_db)):
     keys = db.query(ApiKey).all()
     return keys
 
+from pydantic import BaseModel
+
+class ApiKeyCreate(BaseModel):
+    key: str
+    provider: str = "groq"
+    daily_limit: int = 14400
+
 @router.post("/api-keys")
 def create_api_key(
-    key: str,
-    provider: str = "groq",
-    daily_limit: int = 14400,
+    data: ApiKeyCreate,
     db: Session = Depends(get_db)
 ):
     """Cria uma nova API key"""
     # Verificar se já existe
-    existing = db.query(ApiKey).filter(ApiKey.key == key).first()
+    existing = db.query(ApiKey).filter(ApiKey.key == data.key).first()
     if existing:
         return {"error": "API key already exists", "id": existing.id}
     
     # Criar nova
     api_key = ApiKey(
-        key=key,
-        provider=provider,
-        daily_limit=daily_limit,
+        key=data.key,
+        provider=data.provider,
+        daily_limit=data.daily_limit,
         used_today=0,
         status=True
     )

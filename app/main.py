@@ -6,10 +6,16 @@ app = FastAPI(title="SixPet Catalog Engine", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://catalog.sxconnect.com.br",
+        "https://catalog-api.sxconnect.com.br"
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
 
 app.include_router(catalog.router, prefix="/api/catalog", tags=["catalog"])
