@@ -10,7 +10,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: sxconnect/catalog-frontend
+  IMAGE_NAME: ${{ github.repository }}-frontend
 
 jobs:
   build-and-push:
