@@ -45,13 +45,13 @@ export default function DashboardPage() {
 
     return (
         <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+            <h1 className="text-2xl font-bold text-foreground mb-6">Dashboard</h1>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {cards.map((card) => (
                     <div
                         key={card.name}
-                        className="bg-white overflow-hidden shadow rounded-lg"
+                        className="bg-card overflow-hidden shadow rounded-lg"
                     >
                         <div className="p-5">
                             <div className="flex items-center">
@@ -60,10 +60,10 @@ export default function DashboardPage() {
                                 </div>
                                 <div className="ml-5 w-0 flex-1">
                                     <dl>
-                                        <dt className="text-sm font-medium text-gray-500 truncate">
+                                        <dt className="text-sm font-medium text-foreground/60 truncate">
                                             {card.name}
                                         </dt>
-                                        <dd className="text-2xl font-semibold text-gray-900">
+                                        <dd className="text-2xl font-semibold text-foreground">
                                             {card.value}
                                         </dd>
                                     </dl>
@@ -74,11 +74,11 @@ export default function DashboardPage() {
                 ))}
             </div>
 
-            <div className="mt-8 bg-white shadow rounded-lg p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            <div className="mt-8 bg-card shadow rounded-lg p-6">
+                <h2 className="text-lg font-semibold text-foreground mb-4">
                     Bem-vindo ao SixPet Catalog Manager
                 </h2>
-                <p className="text-gray-600">
+                <p className="text-foreground/70">
                     Sistema de gerenciamento de catálogos de produtos pet com processamento
                     automático via IA.
                 </p>

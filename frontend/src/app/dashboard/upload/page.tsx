@@ -93,14 +93,14 @@ export default function UploadPage() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-gray-900">Upload de Catálogo</h1>
-                <p className="mt-1 text-sm text-gray-600">
+                <h1 className="text-2xl font-bold text-foreground">Upload de Catálogo</h1>
+                <p className="mt-1 text-sm text-foreground/60">
                     Envie um catálogo em PDF para processamento automático
                 </p>
             </div>
 
             {/* Upload Area */}
-            <div className="bg-white shadow rounded-lg p-6">
+            <div className="bg-card shadow rounded-lg p-6">
                 <div
                     {...getRootProps()}
                     className={`
@@ -115,18 +115,18 @@ export default function UploadPage() {
                         {selectedFile ? (
                             <>
                                 <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-                                <p className="text-lg font-medium text-gray-900">{selectedFile.name}</p>
-                                <p className="text-sm text-gray-500 mt-1">
+                                <p className="text-lg font-medium text-foreground">{selectedFile.name}</p>
+                                <p className="text-sm text-foreground/60 mt-1">
                                     {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                                 </p>
                             </>
                         ) : (
                             <>
-                                <Upload className="h-12 w-12 text-gray-400 mb-4" />
-                                <p className="text-lg font-medium text-gray-900">
+                                <Upload className="h-12 w-12 text-foreground/40 mb-4" />
+                                <p className="text-lg font-medium text-foreground">
                                     {isDragActive ? "Solte o arquivo aqui" : "Arraste um PDF ou clique para selecionar"}
                                 </p>
-                                <p className="text-sm text-gray-500 mt-1">
+                                <p className="text-sm text-foreground/60 mt-1">
                                     Apenas arquivos PDF são aceitos
                                 </p>
                             </>
@@ -145,13 +145,13 @@ export default function UploadPage() {
             </div>
 
             {/* Enrichment Options */}
-            <div className="bg-white shadow rounded-lg p-6">
+            <div className="bg-card shadow rounded-lg p-6">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <h2 className="text-lg font-semibold text-gray-900">
+                        <h2 className="text-lg font-semibold text-foreground">
                             Enriquecimento de Dados
                         </h2>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-foreground/60">
                             Buscar informações faltantes via web scraping
                         </p>
                     </div>
@@ -168,7 +168,7 @@ export default function UploadPage() {
 
                 {enrichmentEnabled && (
                     <div className="space-y-3">
-                        <p className="text-sm text-gray-600 mb-4">
+                        <p className="text-sm text-foreground/60 mb-4">
                             Selecione os campos que deseja enriquecer com dados da web:
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -194,14 +194,14 @@ export default function UploadPage() {
                                     />
                                     <div className="ml-3 flex-1">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-sm font-medium text-gray-900">
+                                            <span className="text-sm font-medium text-foreground">
                                                 {field.label}
                                             </span>
                                             {field.required && (
                                                 <span className="text-xs text-red-600">*</span>
                                             )}
                                         </div>
-                                        <p className="text-xs text-gray-500 mt-0.5">
+                                        <p className="text-xs text-foreground/60 mt-0.5">
                                             {field.description}
                                         </p>
                                     </div>
@@ -243,11 +243,11 @@ export default function UploadPage() {
             </div>
 
             {/* Recent Uploads */}
-            <div className="bg-white shadow rounded-lg p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            <div className="bg-card shadow rounded-lg p-6">
+                <h2 className="text-lg font-semibold text-foreground mb-4">
                     Uploads Recentes
                 </h2>
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-foreground/60">
                     Nenhum upload recente
                 </div>
             </div>
