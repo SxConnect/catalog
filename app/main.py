@@ -1,9 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import catalog, products, admin, search, deduplication
-from app.database import engine, Base
-
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="SixPet Catalog Engine", version="1.0.0")
 
