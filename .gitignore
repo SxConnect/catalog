@@ -41,3 +41,16 @@ tests/output/
 *.tmp
 *.bak
 create_tables.sql
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.env.local
+frontend/.env.production.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/package-lock.json
+frontend/yarn.lock
+frontend/pnpm-lock.yaml

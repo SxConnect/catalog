@@ -1,263 +1,254 @@
-# SixPet Catalog Engine
+# 🐾 SixPet Catalog Engine
 
-Sistema automatizado de processamento de catálogos PDF para construir banco de dados de produtos do mercado pet brasileiro.
+Sistema completo de processamento e catalogação de produtos a partir de PDFs usando IA, com interface web moderna.
 
-## 🚀 Funcionalidades
+## ✨ Características
 
-- Upload e processamento de catálogos PDF
-- Extração automática de imagens e texto (OCR)
-- Estruturação de dados com IA (Groq)
-- Detecção de duplicatas (pg_trgm + EAN único)
-- Storage configurável (Filesystem, MinIO, S3)
-- Processamento paralelo com Celery
-- Busca full-text otimizada (GIN indexes)
-- API REST completa
+### Backend
+- 📄 Extração de dados de catálogos em PDF
+- 🤖 Estruturação inteligente com IA (Groq)
+- 🔍 Deduplicação automática de produtos
+- 🌐 Enriquecimento de dados via web scraping
+- 📦 Suporte a múltiplos formatos de storage (Filesystem, MinIO, S3)
+- 🔄 Processamento assíncrono com Celery
+- 🔑 Sistema de rotação de API keys
+- 📊 API REST completa com FastAPI
+- 🗄️ Banco otimizado para 1M+ produtos
 
-## 🏗️ Arquitetura
+### Frontend
+- 🔐 Autenticação com NextAuth
+- 🌓 Tema dark/light com persistência
+- 📤 Upload de PDF com drag & drop
+- 🎯 Seleção de campos para enriquecimento
+- 📈 Dashboard com estatísticas
+- 🔑 Gerenciamento de API Keys com visualização de uso
+- ⚙️ Configurações de web scraping e processamento
+- 📱 Interface responsiva e moderna
 
-```
-FastAPI + PostgreSQL + Redis + Celery + Docker
-```
+## 🚀 Quick Start
 
-### Stack Tecnológica
+### 📖 Documentação
 
-- **Backend:** Python 3.11, FastAPI
-- **Banco:** PostgreSQL 15 (pg_trgm, full-text search)
-- **Cache/Queue:** Redis + Celery
-- **PDF:** PyMuPDF, pdfplumber, Tesseract OCR
-- **IA:** Groq API (estruturação de dados)
-- **Storage:** Filesystem / MinIO / AWS S3
-- **Deploy:** Docker Compose
+- **[PROXIMOS_PASSOS.md](PROXIMOS_PASSOS.md)** - ⭐ COMECE AQUI! Guia rápido de deploy
+- **[DEPLOY_GUIDE.md](DEPLOY_GUIDE.md)** - Guia completo passo a passo
+- **[GIT_COMMANDS.md](GIT_COMMANDS.md)** - Comandos Git para enviar código
+- **[COMANDOS_RAPIDOS.md](COMANDOS_RAPIDOS.md)** - Comandos úteis para o dia a dia
+- **[RESUMO_COMPLETO.md](RESUMO_COMPLETO.md)** - Visão geral do projeto
 
-## 📦 Instalação
-
-### Pré-requisitos
-
-- Docker & Docker Compose
-- Groq API Keys (para IA)
-
-### Quick Start
+### 🎯 Deploy em Produção (15 minutos)
 
 ```bash
-# 1. Clone o repositório
-git clone <repo-url>
-cd catalog
+# 1. Enviar código para GitHub
+git add .
+git commit -m "feat: add frontend application"
+git push origin main
 
-# 2. Configure variáveis de ambiente
-cp .env.example .env
-# Edite .env com suas credenciais
+# 2. Gerar NEXTAUTH_SECRET
+openssl rand -base64 32
 
-# 3. Inicie os serviços
+# 3. Aguardar build no GitHub Actions
+# https://github.com/SxConnect/catalog/actions
+
+# 4. Configurar variáveis no Portainer e fazer deploy
+# Veja PROXIMOS_PASSOS.md para detalhes
+```
+
+### 💻 Desenvolvimento Local
+
+```bash
+# Backend
 docker-compose up -d
+docker exec sixpet-catalog-api alembic upgrade head
 
-# 4. Acesse a API
-http://localhost:8000
-http://localhost:8000/docs  # Swagger UI
+# Frontend
+cd frontend
+npm install
+npm run dev
 ```
 
-## 🔧 Configuração
+## 🏗️ Tecnologias
 
-### Variáveis de Ambiente (.env)
+### Backend
+- **Framework**: FastAPI, Python 3.11
+- **Banco de Dados**: PostgreSQL 15 com pg_trgm
+- **Cache/Queue**: Redis 7
+- **Worker**: Celery
+- **IA**: Groq API (Llama 3)
+- **OCR**: Tesseract, PyMuPDF, pdfplumber
+- **Storage**: Filesystem, MinIO, AWS S3
 
-```env
-# Database
-DATABASE_URL=postgresql://sixpet:sixpet123@postgres:5432/sixpet_catalog
+### Frontend
+- **Framework**: Next.js 14, React 18
+- **Linguagem**: TypeScript
+- **Estilo**: TailwindCSS
+- **Autenticação**: NextAuth
+- **State**: Zustand, React Query
+- **Ícones**: Lucide React
 
-# Redis
-REDIS_URL=redis://redis:6379/0
+### DevOps
+- **Containers**: Docker, Docker Compose
+- **CI/CD**: GitHub Actions
+- **Registry**: GitHub Container Registry
+- **Proxy**: Traefik
+- **SSL**: Let's Encrypt
 
-# Groq API Keys (rotação automática)
-GROQ_API_KEYS=gsk_key1,gsk_key2,gsk_key3
-
-# Storage (filesystem, minio, s3)
-STORAGE_TYPE=filesystem
-STORAGE_PATH=/app/storage
-
-# MinIO/S3 (opcional)
-S3_ENDPOINT=http://minio:9000
-S3_BUCKET=sixpet-catalog
-S3_ACCESS_KEY=minioadmin
-S3_SECRET_KEY=minioadmin
-```
-
-## 📊 Modelo de Dados
-
-### Produto
-
-```json
-{
-  "id": 1,
-  "ean": "7891234567890",
-  "name": "Ração Premium para Cães Adultos",
-  "brand": "Royal Canin",
-  "category": "Alimentação",
-  "description": "Ração completa e balanceada...",
-  "images": ["/storage/products/images/abc123.png"],
-  "attributes": {
-    "weight": "15kg",
-    "flavor": "Frango"
-  },
-  "source_catalog": "catalogo-2025.pdf",
-  "confidence_score": 0.95,
-  "created_at": "2026-03-07T10:00:00Z"
-}
-```
-
-### Índices de Performance
-
-- **EAN:** Índice único (detecção de duplicatas)
-- **Nome/Marca:** Índices trigram GIN (busca fuzzy)
-- **Full-text:** Índice GIN (busca em português)
-- **Compostos:** name+brand+category
-
-## 🔍 API Endpoints
-
-### Upload de Catálogo
-
-```bash
-POST /api/catalog/upload
-Content-Type: multipart/form-data
-
-# Response
-{
-  "catalog_id": 123,
-  "status": "processing"
-}
-```
-
-### Buscar Produtos
-
-```bash
-# Busca full-text
-GET /api/search/?q=ração+premium
-
-# Busca por EAN
-GET /api/search/by-ean/7891234567890
-
-# Busca por marca
-GET /api/search/by-brand/Royal%20Canin
-```
-
-### Verificar Duplicatas
-
-```bash
-GET /api/deduplication/check?name=Ração+Premium&brand=Royal+Canin&ean=7891234567890
-
-# Response
-{
-  "is_duplicate": true,
-  "duplicate_product": {
-    "id": 123,
-    "name": "Ração Premium para Cães",
-    "ean": "7891234567890"
-  }
-}
-```
-
-### Exportar Dados
-
-```bash
-GET /api/products/export/json
-GET /api/products/export/csv
-```
-
-## 🎯 Detecção de Duplicatas
-
-O sistema usa **pg_trgm similarity** para detectar duplicatas:
-
-1. **EAN exato** (prioridade máxima)
-2. **Similaridade trigram** (nome + marca)
-   - Score: `similarity(name) * 0.7 + similarity(brand) * 0.3`
-   - Threshold: 0.85 (configurável)
-
-### Comportamento
-
-```python
-# Catálogo 1: EAN 7891234567890
-→ Cria produto novo
-
-# Catálogo 2: MESMO EAN
-→ Atualiza produto existente
-→ Adiciona novas imagens
-→ Aumenta confidence_score
-→ NÃO cria duplicata ✅
-```
-
-## 📈 Performance
-
-### Teste Real (122 páginas, 2,428 imagens)
-
-- **Tempo:** 45 segundos (0.37s/página)
-- **Memória:** ~300 MB por catálogo
-- **Throughput:** ~162 páginas/minuto
-- **Erros:** 0
-
-### Escalabilidade
-
-| Workers | Catálogos/hora | Memória Total |
-|---------|----------------|---------------|
-| 10      | ~800           | ~3 GB         |
-| 50      | ~4,000         | ~15 GB        |
-
-Suporta **1M+ produtos** com índices otimizados.
-
-## 🗄️ Storage
-
-### Opções Disponíveis
-
-1. **Filesystem** (padrão) - Desenvolvimento
-2. **MinIO** (recomendado) - Produção self-hosted
-3. **AWS S3** - Cloud
-
-Configure via `STORAGE_TYPE` no `.env`.
-
-## 🔄 Fluxo de Processamento
-
-```
-1. Upload PDF → Salva no storage
-2. Celery Task → Divide em páginas
-3. Extrai imagens → Salva com hash único
-4. Extrai texto → OCR se necessário
-5. IA estrutura → JSON padronizado (Groq)
-6. Verifica duplicatas → EAN + similaridade
-7. Salva/Atualiza → PostgreSQL
-8. Pronto para exportação
-```
-
-## 🛠️ Desenvolvimento
-
-### Estrutura do Projeto
+## 📁 Estrutura do Projeto
 
 ```
 catalog/
-├── app/
-│   ├── api/              # Endpoints FastAPI
-│   ├── models/           # SQLAlchemy models
+├── frontend/              # Frontend Next.js
+│   ├── src/
+│   │   ├── app/          # Pages e API routes
+│   │   ├── components/   # Componentes React
+│   │   └── lib/          # Utilitários
+│   └── Dockerfile
+│
+├── app/                   # Backend FastAPI
+│   ├── api/              # Endpoints REST
+│   ├── models/           # Modelos SQLAlchemy
 │   ├── services/         # Lógica de negócio
-│   ├── tasks/            # Celery tasks
-│   └── utils/            # Utilitários
+│   └── tasks/            # Tarefas Celery
+│
 ├── alembic/              # Migrations
-├── storage/              # Armazenamento local
-├── docker-compose.yml
-├── Dockerfile
-└── requirements.txt
+├── .github/workflows/    # GitHub Actions
+├── docker-compose.yml    # Desenvolvimento
+├── docker-compose.prod.yml  # Produção
+└── Documentação/
+    ├── PROXIMOS_PASSOS.md
+    ├── DEPLOY_GUIDE.md
+    ├── COMANDOS_RAPIDOS.md
+    └── RESUMO_COMPLETO.md
 ```
 
-### Rodar Localmente
+## 🌐 URLs de Produção
+
+- **Frontend**: https://catalog.sxconnect.com.br
+- **Backend API**: https://catalog-api.sxconnect.com.br
+- **Documentação**: https://catalog-api.sxconnect.com.br/docs
+
+## 🔧 Configuração
+
+### Variáveis de Ambiente Principais
 
 ```bash
-# Instalar dependências
-pip install -r requirements.txt
+# PostgreSQL
+POSTGRES_USER=sixpet
+POSTGRES_PASSWORD=sua_senha_forte
+POSTGRES_DB=sixpet_catalog
 
-# Rodar migrations
-alembic upgrade head
+# MinIO/S3
+MINIO_S3_DOMAIN=mins3.sxconnect.com.br
+MINIO_ROOT_USER=admin
+MINIO_ROOT_PASSWORD=sua_senha_minio
+S3_BUCKET=sixpet-catalog
 
-# Iniciar API
-uvicorn app.main:app --reload
+# Groq API (separadas por vírgula)
+GROQ_API_KEYS=gsk_key1,gsk_key2,gsk_key3
 
-# Iniciar worker
-celery -A app.tasks.worker worker --loglevel=info
+# Frontend
+NEXTAUTH_SECRET=gere_com_openssl_rand_base64_32
+ADMIN_EMAIL=admin@sixpet.com
+ADMIN_PASSWORD=sua_senha_admin
 ```
+
+Veja `.env.prod.example` para todas as variáveis.
+
+## 📊 API Endpoints
+
+### Catálogos
+
+```bash
+# Upload de catálogo
+POST /api/catalogs/upload
+Content-Type: multipart/form-data
+X-API-Key: sua_chave
+
+# Listar catálogos
+GET /api/catalogs?page=1&page_size=20
+X-API-Key: sua_chave
+```
+
+### Produtos
+
+```bash
+# Listar produtos
+GET /api/products?page=1&page_size=20
+X-API-Key: sua_chave
+
+# Buscar produtos
+GET /api/search?q=ração&category=pet
+X-API-Key: sua_chave
+
+# Obter produto
+GET /api/products/{id}
+X-API-Key: sua_chave
+```
+
+### Admin
+
+```bash
+# Configurações
+GET /api/admin/settings
+PUT /api/admin/settings
+
+# API Keys
+GET /api/admin/api-keys
+POST /api/admin/api-keys
+DELETE /api/admin/api-keys/{id}
+```
+
+## 🛠️ Comandos Úteis
+
+```bash
+# Ver logs
+docker logs -f sixpet-catalog-frontend
+docker logs -f sixpet-catalog-api
+
+# Verificar deployment
+bash check-deployment.sh
+
+# Executar migrations
+docker exec sixpet-catalog-api alembic upgrade head
+
+# Acessar banco
+docker exec -it sixpet-catalog-postgres psql -U sixpet -d sixpet_catalog
+
+# Reiniciar serviços
+docker restart sixpet-catalog-frontend
+docker restart sixpet-catalog-api
+```
+
+Veja [COMANDOS_RAPIDOS.md](COMANDOS_RAPIDOS.md) para mais comandos.
+
+## 🐛 Troubleshooting
+
+Execute o script de verificação:
+
+```bash
+bash check-deployment.sh
+```
+
+Ou consulte:
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Problemas comuns
+- [DEPLOY_GUIDE.md](DEPLOY_GUIDE.md) - Guia completo
+
+## 📈 Performance
+
+- ✅ Otimizado para 1M+ produtos
+- ✅ Índices GIN e trigram no PostgreSQL
+- ✅ Processamento assíncrono com Celery
+- ✅ Cache com Redis
+- ✅ Build otimizado (Next.js standalone)
+- ✅ Multi-stage Docker build
+
+## 🔐 Segurança
+
+- ✅ Autenticação com NextAuth
+- ✅ Senhas hasheadas (bcrypt)
+- ✅ HTTPS obrigatório em produção
+- ✅ Variáveis sensíveis em .env
+- ✅ CORS configurado
+- ✅ SQL injection protection
 
 ## 📝 Licença
 
@@ -265,8 +256,14 @@ MIT
 
 ## 🤝 Contribuindo
 
-Pull requests são bem-vindos!
+Veja [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes.
 
-## 📧 Contato
+## 📞 Suporte
 
-Para dúvidas ou suporte, abra uma issue no GitHub.
+- 📖 Documentação: Veja os arquivos .md na raiz
+- 🐛 Issues: https://github.com/SxConnect/catalog/issues
+- 💬 Discussões: https://github.com/SxConnect/catalog/discussions
+
+---
+
+**Desenvolvido com ❤️ para SixPet**
