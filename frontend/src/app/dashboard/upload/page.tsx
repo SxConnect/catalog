@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { Upload, FileText, CheckCircle, XCircle, Loader } from "lucide-react";
+import { Upload, FileText, CheckCircle, XCircle, Loader, Clock, Package } from "lucide-react";
 import api from "@/lib/api";
 import { useMutation, useQuery } from "react-query";
 
@@ -11,6 +11,16 @@ type EnrichmentField = {
     label: string;
     description: string;
     required: boolean;
+};
+
+type CatalogStatus = {
+    id: number;
+    filename: string;
+    status: string;
+    total_pages: number;
+    processed_pages: number;
+    products_found: number;
+    created_at: string;
 };
 
 const ENRICHMENT_FIELDS: EnrichmentField[] = [
@@ -34,25 +44,69 @@ export default function UploadPage() {
     const [selectedFields, setSelectedFields] = useState<string[]>(
         ENRICHMENT_FIELDS.filter(f => f.required).map(f => f.id)
     );
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [processingCatalogId, setProcessingCatalogId] = useState<number | null>(null);
 
     const { data: settings } = useQuery("settings", async () => {
         const res = await api.get("/api/admin/settings");
         return res.data;
     });
 
+    // Polling para status do catálogo em processamento
+    const { data: catalogStatus } = useQuery(
+        ["catalog-status", processingCatalogId],
+        async () => {
+            if (!processingCatalogId) return null;
+            const res = await api.get(`/api/catalog/${processingCatalogId}`);
+            return res.data;
+        },
+        {
+            enabled: !!processingCatalogId,
+            refetchInterval: (data) => {
+                if (data?.status === "completed" || data?.status === "failed") {
+                    return false;
+                }
+                return 2000;
+            },
+        }
+    );
+
+    // Buscar uploads recentes
+    const { data: recentUploads } = useQuery("recent-uploads", async () => {
+        const res = await api.get("/api/catalog/list?limit=5");
+        return res.data.catalogs || [];
+    });
+
+    useEffect(() => {
+        if (catalogStatus?.status === "completed") {
+            setTimeout(() => {
+                setProcessingCatalogId(null);
+                setUploadProgress(0);
+            }, 3000);
+        }
+    }, [catalogStatus?.status]);
+
     const uploadMutation = useMutation(
         async (data: FormData) => {
             const res = await api.post("/api/catalog/upload", data, {
                 headers: { "Content-Type": "multipart/form-data" },
+                onUploadProgress: (progressEvent) => {
+                    const percentCompleted = Math.round(
+                        (progressEvent.loaded * 100) / (progressEvent.total || 100)
+                    );
+                    setUploadProgress(percentCompleted);
+                },
             });
             return res.data;
         },
         {
-            onSuccess: () => {
+            onSuccess: (data) => {
                 setSelectedFile(null);
+                setProcessingCatalogId(data.catalog_id);
                 alert("Catálogo enviado com sucesso! O processamento começará em breve.");
             },
             onError: (error: any) => {
+                setUploadProgress(0);
                 alert(`Erro ao enviar: ${error.response?.data?.detail || error.message}`);
             },
         }
@@ -64,13 +118,14 @@ export default function UploadPage() {
         onDrop: (acceptedFiles) => {
             if (acceptedFiles.length > 0) {
                 setSelectedFile(acceptedFiles[0]);
+                setUploadProgress(0);
             }
         },
     });
 
     const toggleField = (fieldId: string) => {
         const field = ENRICHMENT_FIELDS.find(f => f.id === fieldId);
-        if (field?.required) return; // Não pode desmarcar campos obrigatórios
+        if (field?.required) return;
 
         setSelectedFields(prev =>
             prev.includes(fieldId)
@@ -90,6 +145,24 @@ export default function UploadPage() {
         uploadMutation.mutate(formData);
     };
 
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case "completed": return "text-green-600 dark:text-green-400";
+            case "processing": return "text-blue-600 dark:text-blue-400";
+            case "failed": return "text-red-600 dark:text-red-400";
+            default: return "text-gray-600 dark:text-gray-400";
+        }
+    };
+
+    const getStatusIcon = (status: string) => {
+        switch (status) {
+            case "completed": return <CheckCircle className="h-5 w-5" />;
+            case "processing": return <Loader className="h-5 w-5 animate-spin" />;
+            case "failed": return <XCircle className="h-5 w-5" />;
+            default: return <Clock className="h-5 w-5" />;
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div>
@@ -106,8 +179,8 @@ export default function UploadPage() {
                     className={`
             border-2 border-dashed rounded-lg p-12 text-center cursor-pointer
             transition-colors
-            ${isDragActive ? "border-primary-500 bg-primary-50" : "border-gray-300 hover:border-primary-400"}
-            ${selectedFile ? "bg-green-50 border-green-500" : ""}
+            ${isDragActive ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20" : "border-border hover:border-primary-400"}
+            ${selectedFile ? "bg-green-50 dark:bg-green-900/20 border-green-500" : ""}
           `}
                 >
                     <input {...getInputProps()} />
@@ -142,6 +215,60 @@ export default function UploadPage() {
                         Remover arquivo
                     </button>
                 )}
+
+                {/* Upload Progress */}
+                {uploadProgress > 0 && uploadProgress < 100 && (
+                    <div className="mt-4">
+                        <div className="flex items-center justify-between text-sm mb-2">
+                            <span className="text-foreground/60">Enviando...</span>
+                            <span className="font-semibold text-foreground">{uploadProgress}%</span>
+                        </div>
+                        <div className="w-full bg-background rounded-full h-2">
+                            <div
+                                className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${uploadProgress}%` }}
+                            ></div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Processing Status */}
+                {catalogStatus && catalogStatus.status === "processing" && (
+                    <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <div className="flex items-center gap-3 mb-3">
+                            <Loader className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-spin" />
+                            <div>
+                                <p className="font-medium text-blue-900 dark:text-blue-100">
+                                    Processando catálogo...
+                                </p>
+                                <p className="text-sm text-blue-700 dark:text-blue-300">
+                                    {catalogStatus.filename}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-blue-700 dark:text-blue-300">
+                                    Páginas processadas
+                                </span>
+                                <span className="font-semibold text-blue-900 dark:text-blue-100">
+                                    {catalogStatus.processed_pages} / {catalogStatus.total_pages}
+                                </span>
+                            </div>
+                            <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                                <div
+                                    className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
+                                    style={{
+                                        width: `${(catalogStatus.processed_pages / catalogStatus.total_pages) * 100}%`
+                                    }}
+                                ></div>
+                            </div>
+                            <p className="text-sm text-blue-700 dark:text-blue-300">
+                                {catalogStatus.products_found} produtos encontrados
+                            </p>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Enrichment Options */}
@@ -162,7 +289,7 @@ export default function UploadPage() {
                             onChange={(e) => setEnrichmentEnabled(e.target.checked)}
                             className="sr-only peer"
                         />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                        <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
                     </label>
                 </div>
 
@@ -179,8 +306,8 @@ export default function UploadPage() {
                     flex items-start p-3 border rounded-lg cursor-pointer
                     transition-colors
                     ${selectedFields.includes(field.id)
-                                            ? "border-primary-500 bg-primary-50"
-                                            : "border-gray-200 hover:border-gray-300"
+                                            ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20"
+                                            : "border-border hover:border-border/80"
                                         }
                     ${field.required ? "opacity-75 cursor-not-allowed" : ""}
                   `}
@@ -210,8 +337,8 @@ export default function UploadPage() {
                         </div>
 
                         {settings?.scraping_enabled && (
-                            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                <p className="text-sm text-blue-800">
+                            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                <p className="text-sm text-blue-800 dark:text-blue-200">
                                     <strong>Configuração atual:</strong> {settings.extractions_per_second} extrações/segundo
                                     {settings.scraping_url && ` • Fonte: ${settings.scraping_url}`}
                                 </p>
@@ -247,9 +374,43 @@ export default function UploadPage() {
                 <h2 className="text-lg font-semibold text-foreground mb-4">
                     Uploads Recentes
                 </h2>
-                <div className="text-sm text-foreground/60">
-                    Nenhum upload recente
-                </div>
+                {recentUploads && recentUploads.length > 0 ? (
+                    <div className="space-y-3">
+                        {recentUploads.map((catalog: CatalogStatus) => (
+                            <div
+                                key={catalog.id}
+                                className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-background/50 transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`${getStatusColor(catalog.status)}`}>
+                                        {getStatusIcon(catalog.status)}
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-foreground">{catalog.filename}</p>
+                                        <p className="text-sm text-foreground/60">
+                                            {catalog.products_found} produtos • {catalog.processed_pages}/{catalog.total_pages} páginas
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className={`text-sm font-medium ${getStatusColor(catalog.status)}`}>
+                                        {catalog.status === "completed" ? "Concluído" :
+                                            catalog.status === "processing" ? "Processando" :
+                                                catalog.status === "failed" ? "Falhou" : "Aguardando"}
+                                    </p>
+                                    <p className="text-xs text-foreground/60">
+                                        {new Date(catalog.created_at).toLocaleString()}
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-8">
+                        <Package className="h-12 w-12 text-foreground/40 mx-auto mb-3" />
+                        <p className="text-foreground/60">Nenhum upload recente</p>
+                    </div>
+                )}
             </div>
         </div>
     );

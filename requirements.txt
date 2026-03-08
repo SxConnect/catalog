@@ -23,7 +23,9 @@ boto3==1.34.34
 botocore==1.34.34
 
 # AI & Web
-httpx==0.26.0
+httpx
+beautifulsoup4
+lxml==0.26.0
 groq==0.4.2
 beautifulsoup4==4.12.3
 lxml==5.1.0
