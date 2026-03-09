@@ -48,3 +48,10 @@ Dockerfile.dev
 # OS
 .DS_Store
 Thumbs.db
+
+# Frontend (NÃO COPIAR)
+frontend/
+node_modules/
+.next/
+*.lock
+package-lock.json
