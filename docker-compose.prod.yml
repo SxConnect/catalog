@@ -32,7 +32,7 @@ services:
       retries: 5
 
   api:
-    image: ghcr.io/sxconnect/catalog:a04a102
+    image: ghcr.io/sxconnect/catalog:latest
     container_name: sixpet-catalog-api
     restart: always
     environment:
@@ -68,7 +68,7 @@ services:
       retries: 3
 
   worker:
-    image: ghcr.io/sxconnect/catalog:a04a102
+    image: ghcr.io/sxconnect/catalog:latest
     container_name: sixpet-catalog-worker
     restart: always
     command: celery -A app.tasks.worker worker --loglevel=info --concurrency=4
@@ -94,7 +94,7 @@ services:
       - portainer_default
 
   frontend:
-    image: ghcr.io/sxconnect/catalog-frontend:a04a102
+    image: ghcr.io/sxconnect/catalog-frontend:latest
     container_name: sixpet-catalog-frontend
     restart: always
     environment:
