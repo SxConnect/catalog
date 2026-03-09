@@ -9,9 +9,13 @@ from pathlib import Path
 router = APIRouter()
 
 @router.post("/upload")
-async def upload_catalog(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_catalog(file: UploadFile = File(..., description="PDF file (max 100MB)"), db: Session = Depends(get_db)):
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files allowed")
+    
+    # Verificar tamanho do arquivo (100MB = 100 * 1024 * 1024 bytes)
+    max_size = 100 * 1024 * 1024
+    file_size = 0
     
     catalog = Catalog(filename=file.filename)
     db.add(catalog)
@@ -21,8 +25,21 @@ async def upload_catalog(file: UploadFile = File(...), db: Session = Depends(get
     file_path = Path(f"/app/storage/catalogs/{catalog.id}_{file.filename}")
     file_path.parent.mkdir(parents=True, exist_ok=True)
     
-    with file_path.open("wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        with file_path.open("wb") as buffer:
+            while chunk := await file.read(1024 * 1024):  # Ler em chunks de 1MB
+                file_size += len(chunk)
+                if file_size > max_size:
+                    file_path.unlink(missing_ok=True)
+                    db.delete(catalog)
+                    db.commit()
+                    raise HTTPException(status_code=413, detail="File too large (max 100MB)")
+                buffer.write(chunk)
+    except Exception as e:
+        file_path.unlink(missing_ok=True)
+        db.delete(catalog)
+        db.commit()
+        raise
     
     process_pdf_task.delay(catalog.id, str(file_path))
     

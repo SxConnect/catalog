@@ -4,6 +4,7 @@ from app.api import catalog, products, admin, search, deduplication
 
 app = FastAPI(title="SixPet Catalog Engine", version="1.0.0")
 
+# Aumentar limite de upload para 100MB
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
