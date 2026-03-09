@@ -23,6 +23,7 @@ services:
     image: redis:7-alpine
     container_name: sixpet-catalog-redis
     restart: always
+    command: redis-server --requirepass "" --protected-mode no
     networks:
       - portainer_default
     healthcheck:
