@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Catalog
+from app.models.catalog import CatalogStatus
 from app.tasks.pdf_processor import process_pdf_task
 import shutil
 from pathlib import Path
@@ -23,7 +24,10 @@ async def upload_catalog(file: UploadFile = File(..., description="PDF file (max
     file_size = 0
     
     logger.info(f"Criando registro no banco para: {file.filename}")
-    catalog = Catalog(filename=file.filename)
+    catalog = Catalog(
+        filename=file.filename,
+        status=CatalogStatus.UPLOADED
+    )
     db.add(catalog)
     db.commit()
     db.refresh(catalog)
