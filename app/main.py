@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import catalog, products, admin, search, deduplication, sitemap, status
 
-app = FastAPI(title="SixPet Catalog Engine", version="1.0.0")
+app = FastAPI(title="SixPet Catalog Engine", version="1.0.7")
 
 # Aumentar limite de upload para 100MB
 app.add_middleware(
@@ -29,7 +29,7 @@ app.include_router(status.router, prefix="/api/status", tags=["status"])
 
 @app.get("/")
 def root():
-    return {"message": "SixPet Catalog Engine API", "version": "1.0.0"}
+    return {"message": "SixPet Catalog Engine API", "version": "1.0.7"}
 
 @app.get("/health")
 def health():
