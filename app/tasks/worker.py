@@ -14,3 +14,6 @@ celery_app.conf.update(
     timezone='America/Sao_Paulo',
     enable_utc=True,
 )
+
+# Import tasks to register them
+from app.tasks import pdf_processor  # noqa
