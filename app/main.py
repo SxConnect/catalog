@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import catalog, products, admin, search, deduplication
+from app.api import catalog, products, admin, search, deduplication, sitemap, status
 
 app = FastAPI(title="SixPet Catalog Engine", version="1.0.0")
 
@@ -24,6 +24,8 @@ app.include_router(products.router, prefix="/api/products", tags=["products"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(deduplication.router, prefix="/api/deduplication", tags=["deduplication"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+app.include_router(sitemap.router, prefix="/api/sitemap", tags=["sitemap"])
+app.include_router(status.router, prefix="/api/status", tags=["status"])
 
 @app.get("/")
 def root():
