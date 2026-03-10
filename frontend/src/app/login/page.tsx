@@ -105,11 +105,6 @@ export default function LoginPage() {
                         {loading ? "Entrando..." : "Entrar"}
                     </button>
                 </form>
-
-                <div className="mt-6 text-center text-sm text-gray-600">
-                    <p>Credenciais padrão:</p>
-                    <p className="font-mono text-xs mt-1">admin@sixpet.com / admin123</p>
-                </div>
             </div>
         </div>
     );
