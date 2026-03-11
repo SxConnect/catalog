@@ -103,6 +103,8 @@ services:
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      # Adicionar variável para URL interna
+      - INTERNAL_API_URL=http://api:8000
     depends_on:
       - api
     networks:
