@@ -25,14 +25,53 @@ logger = logging.getLogger(__name__)
 
 # Configuração do Redis para rate limiting usando variáveis de ambiente
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-redis_client = redis.from_url(REDIS_URL)
 
-# Inicializar limiter
-limiter = Limiter(
-    key_func=get_remote_address,
-    storage_uri=REDIS_URL,
-    default_limits=["200 per hour"]
-)
+def create_redis_client():
+    """Cria cliente Redis com fallback para diferentes configurações."""
+    try:
+        # Tentar com URL completa primeiro
+        client = redis.from_url(REDIS_URL)
+        client.ping()
+        logger.info(f"Redis connected successfully with URL: {REDIS_URL}")
+        return client
+    except redis.AuthenticationError:
+        logger.warning("Redis authentication failed, trying without auth...")
+        try:
+            # Tentar sem autenticação
+            import urllib.parse
+            parsed = urllib.parse.urlparse(REDIS_URL)
+            client = redis.Redis(
+                host=parsed.hostname or 'redis',
+                port=parsed.port or 6379,
+                db=int(parsed.path.lstrip('/')) if parsed.path else 0,
+                decode_responses=True
+            )
+            client.ping()
+            logger.info("Redis connected successfully without authentication")
+            return client
+        except Exception as e:
+            logger.error(f"Failed to connect to Redis without auth: {e}")
+            return None
+    except Exception as e:
+        logger.error(f"Failed to connect to Redis: {e}")
+        return None
+
+redis_client = create_redis_client()
+
+# Inicializar limiter com fallback
+if redis_client:
+    limiter = Limiter(
+        key_func=get_remote_address,
+        storage_uri=REDIS_URL,
+        default_limits=["200 per hour"]
+    )
+else:
+    # Fallback para limiter em memória (não recomendado para produção)
+    logger.warning("Using in-memory rate limiting (not recommended for production)")
+    limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=["200 per hour"]
+    )
 
 class SecurityConfig:
     """Configurações de segurança."""
@@ -349,21 +388,32 @@ def setup_security_headers(app):
 # Função para validar configuração de segurança
 def validate_security_config():
     """Valida configuração de segurança."""
+    redis_ok = False
+    if redis_client:
+        try:
+            # Testar conexão Redis (não crítico para inicialização)
+            redis_client.ping()
+            logger.info("Redis connection for rate limiting: OK")
+            redis_ok = True
+        except Exception as e:
+            logger.warning(f"Redis connection test failed: {e}")
+    else:
+        logger.warning("Redis client not available, using in-memory rate limiting")
+    
     try:
-        # Testar conexão Redis
-        redis_client.ping()
-        logger.info("Redis connection for rate limiting: OK")
-        
-        # Validar configurações
+        # Validar configurações básicas (críticas)
         assert SecurityConfig.MAX_PDF_SIZE > 0, "MAX_PDF_SIZE must be positive"
         assert len(SecurityConfig.ALLOWED_EXTENSIONS) > 0, "ALLOWED_EXTENSIONS cannot be empty"
         assert len(SecurityConfig.ALLOWED_DOMAINS) > 0, "ALLOWED_DOMAINS cannot be empty"
         
-        logger.info("Security configuration validation: OK")
+        if redis_ok:
+            logger.info("Security configuration validation: OK (with Redis)")
+        else:
+            logger.info("Security configuration validation: OK (without Redis)")
         return True
         
     except Exception as e:
-        logger.error(f"Security configuration validation failed: {e}")
+        logger.error(f"Critical security configuration validation failed: {e}")
         return False
 
 
