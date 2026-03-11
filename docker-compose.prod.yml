@@ -6,9 +6,9 @@ services:
     container_name: sixpet-catalog-postgres
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-sixpet}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sixpet123}
-      POSTGRES_DB: ${POSTGRES_DB:-sixpet_catalog}
+      POSTGRES_USER: sixpet
+      POSTGRES_PASSWORD: hgLqTSKJ1STDuf
+      POSTGRES_DB: sixpet_catalog
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -36,7 +36,7 @@ services:
     container_name: sixpet-catalog-api
     restart: always
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-sixpet}:${POSTGRES_PASSWORD:-sixpet123}@postgres:5432/${POSTGRES_DB:-sixpet_catalog}
+      - DATABASE_URL=postgresql://sixpet:hgLqTSKJ1STDuf@postgres:5432/sixpet_catalog
       - REDIS_URL=redis://redis:6379/0
       - GROQ_API_KEYS=${GROQ_API_KEYS}
       - STORAGE_TYPE=minio
@@ -73,7 +73,7 @@ services:
     restart: always
     command: celery -A app.tasks.worker worker --loglevel=info --concurrency=4
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-sixpet}:${POSTGRES_PASSWORD:-sixpet123}@postgres:5432/${POSTGRES_DB:-sixpet_catalog}
+      - DATABASE_URL=postgresql://sixpet:hgLqTSKJ1STDuf@postgres:5432/sixpet_catalog
       - REDIS_URL=redis://redis:6379/0
       - GROQ_API_KEYS=${GROQ_API_KEYS}
       - STORAGE_TYPE=minio
