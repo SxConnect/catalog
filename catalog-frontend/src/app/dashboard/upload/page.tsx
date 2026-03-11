@@ -443,14 +443,14 @@ export default function UploadPage() {
             )}
 
             {/* Catálogos Processados */}
-            <div className="bg-white shadow rounded-lg p-6">
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
                 <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-semibold text-gray-900">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                         Catálogos Processados
                     </h2>
                     <button
                         onClick={() => refetchRecent()}
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                     >
                         <RotateCcw className="h-4 w-4" />
                         Atualizar
@@ -462,7 +462,7 @@ export default function UploadPage() {
                         {recentCatalogs.map((catalog: any) => (
                             <div
                                 key={catalog.id}
-                                className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                             >
                                 {/* Header do catálogo */}
                                 <div className="flex items-center justify-between mb-3">
@@ -471,8 +471,8 @@ export default function UploadPage() {
                                             {getStatusIcon(catalog.status)}
                                         </div>
                                         <div>
-                                            <h3 className="font-medium text-gray-900">{catalog.filename}</h3>
-                                            <p className="text-sm text-gray-500">
+                                            <h3 className="font-medium text-gray-900 dark:text-white">{catalog.filename}</h3>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">
                                                 ID: {catalog.id} • Criado em {formatDate(catalog.created_at)}
                                             </p>
                                         </div>
@@ -489,13 +489,13 @@ export default function UploadPage() {
 
                                 {/* Barra de progresso */}
                                 <div className="mb-3">
-                                    <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
+                                    <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
                                         <span>Progresso: {catalog.progress_percentage}%</span>
                                         <span>
                                             Página {catalog.processed_pages} de {catalog.total_pages}
                                         </span>
                                     </div>
-                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                         <div
                                             className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(catalog.status, catalog.progress_percentage)}`}
                                             style={{ width: `${catalog.progress_percentage}%` }}
@@ -506,35 +506,35 @@ export default function UploadPage() {
                                 {/* Estatísticas */}
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                                     <div className="text-center">
-                                        <div className="text-lg font-semibold text-gray-900">
+                                        <div className="text-lg font-semibold text-gray-900 dark:text-white">
                                             {catalog.products_found}
                                         </div>
-                                        <div className="text-xs text-gray-500">Produtos</div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">Produtos</div>
                                     </div>
                                     <div className="text-center">
-                                        <div className="text-lg font-semibold text-gray-900">
+                                        <div className="text-lg font-semibold text-gray-900 dark:text-white">
                                             {catalog.total_pages}
                                         </div>
-                                        <div className="text-xs text-gray-500">Páginas</div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">Páginas</div>
                                     </div>
                                     <div className="text-center">
-                                        <div className="text-lg font-semibold text-gray-900">
+                                        <div className="text-lg font-semibold text-gray-900 dark:text-white">
                                             {catalog.processed_pages}
                                         </div>
-                                        <div className="text-xs text-gray-500">Processadas</div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">Processadas</div>
                                     </div>
                                     <div className="text-center">
-                                        <div className="text-lg font-semibold text-gray-900">
+                                        <div className="text-lg font-semibold text-gray-900 dark:text-white">
                                             {catalog.estimated_time_remaining_seconds ?
                                                 formatTime(catalog.estimated_time_remaining_seconds) :
                                                 catalog.status === "completed" ? "Concluído" : "-"}
                                         </div>
-                                        <div className="text-xs text-gray-500">Tempo restante</div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">Tempo restante</div>
                                     </div>
                                 </div>
 
                                 {/* Controles de processamento */}
-                                <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                                <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
                                     <div className="flex items-center gap-2">
                                         {catalog.status === "processing" && (
                                             <>
@@ -605,7 +605,7 @@ export default function UploadPage() {
                                     <div className="flex items-center gap-2">
                                         <button
                                             onClick={() => setProcessingCatalogId(catalog.id)}
-                                            className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                                            className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
                                             title="Ver detalhes"
                                         >
                                             <Eye className="h-4 w-4" />
@@ -650,9 +650,9 @@ export default function UploadPage() {
                     </div>
                 ) : (
                     <div className="text-center py-12">
-                        <FileText className="mx-auto h-12 w-12 text-gray-400" />
-                        <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum catálogo processado</h3>
-                        <p className="mt-1 text-sm text-gray-500">
+                        <FileText className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
+                        <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Nenhum catálogo processado</h3>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                             Faça upload de um arquivo PDF para começar o processamento.
                         </p>
                     </div>
