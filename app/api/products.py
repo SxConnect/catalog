@@ -4,12 +4,16 @@ from sqlalchemy import func, or_, desc, asc
 from app.database import get_db
 from app.models import Product
 from app.middleware.security import rate_limit_products
+from app.utils.cache import cache_products_list, cache_search_results, invalidate_products_cache
 from typing import List, Optional
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/search")
 @rate_limit_products()
+@cache_search_results(ttl=180)  # Cache por 3 minutos
 def search_products(
     q: Optional[str] = Query(None, min_length=2),
     brand: Optional[str] = None,
@@ -67,6 +71,7 @@ def search_products(
 
 @router.get("/", response_model=List[dict])
 @rate_limit_products()
+@cache_products_list(ttl=300)  # Cache por 5 minutos
 def list_products(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, le=100),

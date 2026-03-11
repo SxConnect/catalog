@@ -10,6 +10,7 @@ from app.middleware.security import (
     FileValidationError,
     log_security_event
 )
+from app.utils.cache import invalidate_products_cache, invalidate_stats_cache
 import shutil
 from pathlib import Path
 import logging
@@ -102,6 +103,11 @@ async def upload_catalog(
             },
             request
         )
+        
+        # Invalidar cache relacionado (produtos e stats serão atualizados após processamento)
+        invalidate_products_cache()
+        invalidate_stats_cache()
+        logger.info("Cache invalidated after catalog upload")
         
         process_pdf_task.delay(catalog.id, str(file_path))
         

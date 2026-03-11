@@ -4,11 +4,15 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models import Catalog, Product, ApiKey
 from app.middleware.security import rate_limit_admin
+from app.utils.cache import cache_dashboard_stats, invalidate_stats_cache
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/stats")
 @rate_limit_admin()
+@cache_dashboard_stats(ttl=60)  # Cache por 1 minuto
 def get_stats(db: Session = Depends(get_db)):
     total_catalogs = db.query(func.count(Catalog.id)).scalar()
     total_products = db.query(func.count(Product.id)).scalar()

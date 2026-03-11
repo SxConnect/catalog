@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.utils.retry import get_all_circuit_breaker_stats, reset_circuit_breaker, validate_retry_config
+from app.utils.cache import CacheStats, invalidate_all_cache, invalidate_products_cache, invalidate_stats_cache, validate_cache_config
 from app.middleware.security import rate_limit_admin
 from typing import Dict, Any
 import redis
@@ -140,6 +141,22 @@ def get_services_status(db: Session = Depends(get_db)):
         }
         overall_healthy = False
     
+    # Verificar sistema de cache
+    try:
+        cache_ok = validate_cache_config()
+        services_status["cache_system"] = {
+            "status": "healthy" if cache_ok else "unhealthy",
+            "message": "Cache system OK" if cache_ok else "Cache system configuration error"
+        }
+        if not cache_ok:
+            overall_healthy = False
+    except Exception as e:
+        services_status["cache_system"] = {
+            "status": "unhealthy",
+            "message": f"Cache system error: {str(e)}"
+        }
+        overall_healthy = False
+    
     return {
         "overall_status": "healthy" if overall_healthy else "unhealthy",
         "services": services_status,
@@ -189,5 +206,100 @@ def get_basic_metrics(db: Session = Depends(get_db)):
         logger.error(f"Error getting metrics: {e}")
         return {
             "error": "Failed to get metrics",
+            "timestamp": __import__('datetime').datetime.utcnow().isoformat()
+        }
+
+@router.get("/cache")
+@rate_limit_admin()
+def get_cache_status():
+    """
+    Retorna status e estatísticas do cache Redis.
+    
+    Returns:
+        Estatísticas detalhadas do cache
+    """
+    try:
+        stats = CacheStats.get_stats()
+        return {
+            "status": "success",
+            "cache_stats": stats,
+            "cache_config": {
+                "default_ttl": 300,
+                "products_ttl": 300,
+                "stats_ttl": 60,
+                "dedup_ttl": 86400,
+                "search_ttl": 180
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting cache status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/cache/invalidate")
+@rate_limit_admin()
+def invalidate_cache(
+    cache_type: str = Query(..., pattern="^(all|products|stats)$")
+):
+    """
+    Invalida cache específico ou todo o cache.
+    
+    Args:
+        cache_type: Tipo de cache a invalidar (all, products, stats)
+        
+    Returns:
+        Número de chaves invalidadas
+    """
+    try:
+        if cache_type == "all":
+            keys_deleted = invalidate_all_cache()
+            message = f"All cache invalidated - {keys_deleted} keys deleted"
+        elif cache_type == "products":
+            keys_deleted = invalidate_products_cache()
+            message = f"Products cache invalidated - {keys_deleted} keys deleted"
+        elif cache_type == "stats":
+            keys_deleted = invalidate_stats_cache()
+            message = f"Stats cache invalidated - {keys_deleted} keys deleted"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid cache type")
+        
+        logger.info(f"Cache invalidation requested: {message}")
+        
+        return {
+            "status": "success",
+            "message": message,
+            "keys_deleted": keys_deleted,
+            "cache_type": cache_type
+        }
+        
+    except Exception as e:
+        logger.error(f"Error invalidating cache: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/cache/metrics")
+def get_cache_metrics():
+    """
+    Métricas de cache para monitoramento (sem autenticação).
+    
+    Returns:
+        Métricas básicas do cache em formato JSON
+    """
+    try:
+        stats = CacheStats.get_stats()
+        
+        return {
+            "cache_metrics": {
+                "total_keys": stats.get("total_keys", 0),
+                "memory_usage": stats.get("memory_usage", "N/A"),
+                "keys_by_prefix": stats.get("keys_by_prefix", {}),
+                "connected_clients": stats.get("connected_clients", 0),
+                "uptime_seconds": stats.get("uptime_seconds", 0)
+            },
+            "timestamp": __import__('datetime').datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting cache metrics: {e}")
+        return {
+            "error": "Failed to get cache metrics",
             "timestamp": __import__('datetime').datetime.utcnow().isoformat()
         }

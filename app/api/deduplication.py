@@ -3,12 +3,16 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.deduplication_service import DeduplicationService
 from app.middleware.security import rate_limit_products, rate_limit_admin
+from app.utils.cache import cache_deduplication_by_ean
 from typing import Optional
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/check")
 @rate_limit_products()
+@cache_deduplication_by_ean(ttl=86400)  # Cache por 24 horas
 def check_duplicate(
     name: str = Query(..., min_length=2),
     brand: str = Query(..., min_length=2),
