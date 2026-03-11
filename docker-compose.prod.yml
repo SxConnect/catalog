@@ -32,11 +32,11 @@ services:
       retries: 5
 
   api:
-    image: ghcr.io/sxconnect/catalog-backend:v1.0.8-rate-limit-fix
+    image: ghcr.io/sxconnect/catalog-backend:latest
     container_name: sixpet-catalog-api
     restart: always
     environment:
-      - DATABASE_URL=postgresql://sixpet:hgLqTSKJ1STDuf@postgres:5432/sixpet_catalog
+      - DATABASE_URL=postgresql://sixpet:9gkGSIXJ157Dbf@postgres:5432/sixpet_catalog
       - REDIS_URL=redis://redis:6379/0
       - GROQ_API_KEYS=${GROQ_API_KEYS}
       - STORAGE_TYPE=minio
@@ -68,12 +68,12 @@ services:
       retries: 3
 
   worker:
-    image: ghcr.io/sxconnect/catalog-backend:v1.0.8-rate-limit-fix
+    image: ghcr.io/sxconnect/catalog-backend:latest
     container_name: sixpet-catalog-worker
     restart: always
     command: celery -A app.tasks.worker worker --loglevel=info --concurrency=4
     environment:
-      - DATABASE_URL=postgresql://sixpet:hgLqTSKJ1STDuf@postgres:5432/sixpet_catalog
+      - DATABASE_URL=postgresql://sixpet:9gkGSIXJ157Dbf@postgres:5432/sixpet_catalog
       - REDIS_URL=redis://redis:6379/0
       - GROQ_API_KEYS=${GROQ_API_KEYS}
       - STORAGE_TYPE=minio

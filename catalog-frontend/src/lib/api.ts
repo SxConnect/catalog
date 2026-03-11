@@ -7,8 +7,8 @@ const getApiUrl = () => {
         return 'http://sixpet-catalog-api:8000';
     }
 
-    // No cliente, usar proxy do Next.js (baseURL vazia = URL relativa)
-    return '';
+    // No cliente, usar HTTPS primeiro
+    return 'https://catalog-api.sxconnect.com.br';
 };
 
 const api = axios.create({
@@ -20,7 +20,7 @@ const api = axios.create({
     withCredentials: false,
 });
 
-// Interceptor para log de erros
+// Interceptor para log de erros e fallback para HTTP
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
@@ -31,6 +31,23 @@ api.interceptors.response.use(
             message: error.message,
             baseURL: error.config?.baseURL
         });
+
+        // Se for erro de CORS/SSL no cliente, tentar HTTP
+        if (typeof window !== 'undefined' &&
+            (error.code === 'ERR_NETWORK' || error.response?.status === 404) &&
+            error.config?.baseURL?.includes('https://')) {
+
+            console.warn('HTTPS falhou, tentando HTTP...');
+            const httpUrl = error.config.baseURL.replace('https://', 'http://');
+
+            // Criar nova requisição com HTTP
+            const newConfig = {
+                ...error.config,
+                baseURL: httpUrl
+            };
+
+            return axios.request(newConfig);
+        }
 
         return Promise.reject(error);
     }
