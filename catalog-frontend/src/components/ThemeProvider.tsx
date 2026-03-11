@@ -17,27 +17,38 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         setMounted(true);
+
+        // Verificar tema salvo no localStorage
         const savedTheme = localStorage.getItem("theme") as Theme;
-        if (savedTheme) {
+        if (savedTheme && (savedTheme === "light" || savedTheme === "dark")) {
             setTheme(savedTheme);
             document.documentElement.classList.toggle("dark", savedTheme === "dark");
         } else {
+            // Verificar preferência do sistema
             const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
             const initialTheme = prefersDark ? "dark" : "light";
             setTheme(initialTheme);
             document.documentElement.classList.toggle("dark", prefersDark);
+            localStorage.setItem("theme", initialTheme);
         }
     }, []);
 
     const toggleTheme = () => {
+        if (!mounted) return;
+
         const newTheme = theme === "light" ? "dark" : "light";
         setTheme(newTheme);
         localStorage.setItem("theme", newTheme);
         document.documentElement.classList.toggle("dark", newTheme === "dark");
     };
 
+    // Evitar problemas de hidratação renderizando sem tema até estar montado
     if (!mounted) {
-        return <>{children}</>;
+        return (
+            <ThemeContext.Provider value={{ theme: "light", toggleTheme: () => { } }}>
+                {children}
+            </ThemeContext.Provider>
+        );
     }
 
     return (
