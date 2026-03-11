@@ -2,12 +2,11 @@ name: Build and Push Frontend Docker Image
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
     paths:
-      - 'frontend/**'
+      - 'catalog-frontend/**'
       - '.github/workflows/docker-publish-frontend.yml'
-    tags:
-      - 'v*.*.*'
+    tags: [ 'v*.*.*' ]
   workflow_dispatch:
 
 env:
@@ -45,12 +44,13 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix={{branch}}-
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
+          context: ./catalog-frontend
+          file: ./catalog-frontend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

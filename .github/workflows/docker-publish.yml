@@ -1,15 +1,17 @@
-name: Build and Push Docker Image
+name: Build and Push Backend Docker Image
 
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'catalog/**'
+      - '.github/workflows/docker-publish.yml'
     tags: [ 'v*.*.*' ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: sxconnect/catalog-backend
 
 jobs:
   build-and-push:
@@ -42,11 +44,13 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix={{branch}}-
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./catalog
+          file: ./catalog/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

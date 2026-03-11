@@ -1,128 +1,162 @@
 version: '3.8'
 
 services:
-  postgres:
+  # Backend API
+  catalog-api:
+    image: ghcr.io/sxconnect/catalog-backend:latest
+    container_name: sixpet-catalog-api
+    restart: unless-stopped
+    environment:
+      # Database
+      POSTGRES_HOST: catalog-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@catalog-postgres:5432/${POSTGRES_DB}
+      
+      # Redis
+      REDIS_URL: redis://catalog-redis:6379/0
+      
+      # MinIO/S3
+      MINIO_S3_DOMAIN: ${MINIO_S3_DOMAIN}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      
+      # AI Services
+      GROQ_API_KEYS: ${GROQ_API_KEYS}
+      
+      # App Config
+      SECRET_KEY: ${SECRET_KEY}
+      ENVIRONMENT: production
+      DEBUG: "false"
+      
+      # CORS
+      FRONTEND_URL: https://catalog.sxconnect.com.br
+      
+    depends_on:
+      - catalog-postgres
+      - catalog-redis
+    networks:
+      - catalog-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.catalog-api.rule=Host(`catalog-api.sxconnect.com.br`)"
+      - "traefik.http.routers.catalog-api.tls=true"
+      - "traefik.http.routers.catalog-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.catalog-api.loadbalancer.server.port=8000"
+
+  # Frontend
+  catalog-frontend:
+    image: ghcr.io/sxconnect/catalog-frontend:latest
+    container_name: sixpet-catalog-frontend
+    restart: unless-stopped
+    environment:
+      NEXTAUTH_URL: https://catalog.sxconnect.com.br
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXT_PUBLIC_API_URL: https://catalog-api.sxconnect.com.br
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    depends_on:
+      - catalog-api
+    networks:
+      - catalog-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.catalog-frontend.rule=Host(`catalog.sxconnect.com.br`)"
+      - "traefik.http.routers.catalog-frontend.tls=true"
+      - "traefik.http.routers.catalog-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.catalog-frontend.loadbalancer.server.port=3000"
+
+  # PostgreSQL Database
+  catalog-postgres:
     image: postgres:15-alpine
     container_name: sixpet-catalog-postgres
-    restart: always
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-sixpet}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sixpet123}
-      POSTGRES_DB: ${POSTGRES_DB:-sixpet_catalog}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./catalog/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
-      - portainer_default
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sixpet -d sixpet_catalog"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - catalog-network
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_trgm
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
 
-  redis:
+  # Redis Cache
+  catalog-redis:
     image: redis:7-alpine
     container_name: sixpet-catalog-redis
-    restart: always
-    command: redis-server --requirepass "" --protected-mode no
-    networks:
-      - portainer_default
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  api:
-    image: ghcr.io/sxconnect/catalog:1.0.7
-    container_name: sixpet-catalog-api
-    restart: always
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-sixpet}:${POSTGRES_PASSWORD:-sixpet123}@postgres:5432/${POSTGRES_DB:-sixpet_catalog}
-      - REDIS_URL=redis://redis:6379/0
-      - GROQ_API_KEYS=${GROQ_API_KEYS}
-      - STORAGE_TYPE=minio
-      - S3_ENDPOINT=https://${MINIO_S3_DOMAIN:-mins3.sxconnect.com.br}
-      - S3_BUCKET=${S3_BUCKET:-sixpet-catalog}
-      - S3_ACCESS_KEY=${MINIO_ROOT_USER:-admin}
-      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
-      - S3_PUBLIC_URL=https://${MINIO_S3_DOMAIN:-mins3.sxconnect.com.br}
-      - S3_REGION=us-east-1
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
-      - catalog_storage:/app/storage
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - redis_data:/data
     networks:
-      - portainer_default
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.catalog-api.rule=Host(`catalog-api.sxconnect.com.br`)
-      - traefik.http.routers.catalog-api.entrypoints=websecure
-      - traefik.http.routers.catalog-api.tls.certresolver=leresolver
-      - traefik.http.services.catalog-api.loadbalancer.server.port=8000
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - catalog-network
 
-  worker:
-    image: ghcr.io/sxconnect/catalog:1.0.7
+  # Celery Worker
+  catalog-worker:
+    image: ghcr.io/sxconnect/catalog-backend:latest
     container_name: sixpet-catalog-worker
-    restart: always
-    command: celery -A app.tasks.worker worker --loglevel=info --concurrency=4
+    restart: unless-stopped
+    command: celery -A app.tasks.worker worker --loglevel=info --concurrency=2
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-sixpet}:${POSTGRES_PASSWORD:-sixpet123}@postgres:5432/${POSTGRES_DB:-sixpet_catalog}
-      - REDIS_URL=redis://redis:6379/0
-      - GROQ_API_KEYS=${GROQ_API_KEYS}
-      - STORAGE_TYPE=minio
-      - S3_ENDPOINT=https://${MINIO_S3_DOMAIN:-mins3.sxconnect.com.br}
-      - S3_BUCKET=${S3_BUCKET:-sixpet-catalog}
-      - S3_ACCESS_KEY=${MINIO_ROOT_USER:-admin}
-      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
-      - S3_PUBLIC_URL=https://${MINIO_S3_DOMAIN:-mins3.sxconnect.com.br}
-      - S3_REGION=us-east-1
+      # Database
+      POSTGRES_HOST: catalog-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@catalog-postgres:5432/${POSTGRES_DB}
+      
+      # Redis
+      REDIS_URL: redis://catalog-redis:6379/0
+      
+      # MinIO/S3
+      MINIO_S3_DOMAIN: ${MINIO_S3_DOMAIN}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      
+      # AI Services
+      GROQ_API_KEYS: ${GROQ_API_KEYS}
+      
+      # App Config
+      SECRET_KEY: ${SECRET_KEY}
+      ENVIRONMENT: production
+      DEBUG: "false"
+      
+    depends_on:
+      - catalog-postgres
+      - catalog-redis
+    networks:
+      - catalog-network
     volumes:
-      - catalog_storage:/app/storage
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - portainer_default
-  frontend:
-    image: ghcr.io/sxconnect/catalog-frontend:1.0.2
-    container_name: sixpet-catalog-frontend
-    restart: always
-    environment:
-      - NEXT_PUBLIC_API_URL=https://catalog-api.sxconnect.com.br
-      - NEXTAUTH_URL=https://catalog.sxconnect.com.br
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - ADMIN_EMAIL=${ADMIN_EMAIL}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-    depends_on:
-      - api
-    networks:
-      - portainer_default
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.catalog-frontend.rule=Host(`catalog.sxconnect.com.br`)
-      - traefik.http.routers.catalog-frontend.entrypoints=websecure
-      - traefik.http.routers.catalog-frontend.tls.certresolver=leresolver
-      - traefik.http.services.catalog-frontend.loadbalancer.server.port=3000
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - ./catalog/storage:/app/storage
 
 volumes:
   postgres_data:
-  catalog_storage:
+    driver: local
+  redis_data:
+    driver: local
 
 networks:
-  default:
-    name: catalog_network
+  catalog-network:
+    driver: bridge

@@ -2,9 +2,29 @@
 
 Sistema completo de processamento e catalogação de produtos a partir de PDFs usando IA, com interface web moderna.
 
+## 📁 Estrutura do Projeto
+
+```
+├── catalog/                    # Backend API (FastAPI + Python)
+│   ├── app/                   # Código da aplicação
+│   ├── alembic/               # Migrações do banco
+│   ├── tests/                 # Testes automatizados
+│   └── Dockerfile             # Build do backend
+│
+├── catalog-frontend/          # Frontend (Next.js + TypeScript)
+│   ├── src/                   # Código da aplicação
+│   │   ├── app/              # Pages e API routes
+│   │   └── components/       # Componentes React
+│   └── Dockerfile            # Build do frontend
+│
+├── .github/workflows/         # CI/CD GitHub Actions
+├── docker-compose.prod.yml    # Deploy em produção
+└── deploy.sh / deploy.ps1     # Scripts de deploy
+```
+
 ## ✨ Características
 
-### Backend
+### Backend (catalog/)
 - 📄 Extração de dados de catálogos em PDF
 - 🤖 Estruturação inteligente com IA (Groq)
 - 🔍 Deduplicação automática de produtos
@@ -15,7 +35,7 @@ Sistema completo de processamento e catalogação de produtos a partir de PDFs u
 - 📊 API REST completa com FastAPI
 - 🗄️ Banco otimizado para 1M+ produtos
 
-### Frontend
+### Frontend (catalog-frontend/)
 - 🔐 Autenticação com NextAuth
 - 🌓 Tema dark/light com persistência
 - 📤 Upload de PDF com drag & drop
@@ -25,43 +45,43 @@ Sistema completo de processamento e catalogação de produtos a partir de PDFs u
 - ⚙️ Configurações de web scraping e processamento
 - 📱 Interface responsiva e moderna
 
-## 🚀 Quick Start
+## 🚀 Deploy Rápido (Produção)
 
-### 📖 Documentação
-
-- **[PROXIMOS_PASSOS.md](PROXIMOS_PASSOS.md)** - ⭐ COMECE AQUI! Guia rápido de deploy
-- **[DEPLOY_GUIDE.md](DEPLOY_GUIDE.md)** - Guia completo passo a passo
-- **[GIT_COMMANDS.md](GIT_COMMANDS.md)** - Comandos Git para enviar código
-- **[COMANDOS_RAPIDOS.md](COMANDOS_RAPIDOS.md)** - Comandos úteis para o dia a dia
-- **[RESUMO_COMPLETO.md](RESUMO_COMPLETO.md)** - Visão geral do projeto
-
-### 🎯 Deploy em Produção (15 minutos)
-
+### 1. Configurar Variáveis de Ambiente
 ```bash
-# 1. Enviar código para GitHub
-git add .
-git commit -m "feat: add frontend application"
-git push origin main
+# Copiar arquivo de exemplo
+cp .env.prod.example .env
 
-# 2. Gerar NEXTAUTH_SECRET
-openssl rand -base64 32
-
-# 3. Aguardar build no GitHub Actions
-# https://github.com/SxConnect/catalog/actions
-
-# 4. Configurar variáveis no Portainer e fazer deploy
-# Veja PROXIMOS_PASSOS.md para detalhes
+# Editar variáveis (PostgreSQL, MinIO, Groq API, etc.)
+nano .env
 ```
 
-### 💻 Desenvolvimento Local
-
+### 2. Executar Deploy
 ```bash
-# Backend
+# Linux/Mac
+./deploy.sh
+
+# Windows PowerShell
+./deploy.ps1
+```
+
+### 3. Acessar Sistema
+- **Frontend**: https://catalog.sxconnect.com.br
+- **Backend API**: https://catalog-api.sxconnect.com.br
+- **Documentação**: https://catalog-api.sxconnect.com.br/docs
+
+## 💻 Desenvolvimento Local
+
+### Backend
+```bash
+cd catalog
 docker-compose up -d
 docker exec sixpet-catalog-api alembic upgrade head
+```
 
-# Frontend
-cd frontend
+### Frontend
+```bash
+cd catalog-frontend
 npm install
 npm run dev
 ```
@@ -88,48 +108,13 @@ npm run dev
 ### DevOps
 - **Containers**: Docker, Docker Compose
 - **CI/CD**: GitHub Actions
-- **Registry**: GitHub Container Registry
+- **Registry**: GitHub Container Registry (GHCR)
 - **Proxy**: Traefik
 - **SSL**: Let's Encrypt
-
-## 📁 Estrutura do Projeto
-
-```
-catalog/
-├── frontend/              # Frontend Next.js
-│   ├── src/
-│   │   ├── app/          # Pages e API routes
-│   │   ├── components/   # Componentes React
-│   │   └── lib/          # Utilitários
-│   └── Dockerfile
-│
-├── app/                   # Backend FastAPI
-│   ├── api/              # Endpoints REST
-│   ├── models/           # Modelos SQLAlchemy
-│   ├── services/         # Lógica de negócio
-│   └── tasks/            # Tarefas Celery
-│
-├── alembic/              # Migrations
-├── .github/workflows/    # GitHub Actions
-├── docker-compose.yml    # Desenvolvimento
-├── docker-compose.prod.yml  # Produção
-└── Documentação/
-    ├── PROXIMOS_PASSOS.md
-    ├── DEPLOY_GUIDE.md
-    ├── COMANDOS_RAPIDOS.md
-    └── RESUMO_COMPLETO.md
-```
-
-## 🌐 URLs de Produção
-
-- **Frontend**: https://catalog.sxconnect.com.br
-- **Backend API**: https://catalog-api.sxconnect.com.br
-- **Documentação**: https://catalog-api.sxconnect.com.br/docs
 
 ## 🔧 Configuração
 
 ### Variáveis de Ambiente Principais
-
 ```bash
 # PostgreSQL
 POSTGRES_USER=sixpet
@@ -151,12 +136,9 @@ ADMIN_EMAIL=admin@sixpet.com
 ADMIN_PASSWORD=sua_senha_admin
 ```
 
-Veja `.env.prod.example` para todas as variáveis.
-
 ## 📊 API Endpoints
 
 ### Catálogos
-
 ```bash
 # Upload de catálogo
 POST /api/catalogs/upload
@@ -169,7 +151,6 @@ X-API-Key: sua_chave
 ```
 
 ### Produtos
-
 ```bash
 # Listar produtos
 GET /api/products?page=1&page_size=20
@@ -184,19 +165,6 @@ GET /api/products/{id}
 X-API-Key: sua_chave
 ```
 
-### Admin
-
-```bash
-# Configurações
-GET /api/admin/settings
-PUT /api/admin/settings
-
-# API Keys
-GET /api/admin/api-keys
-POST /api/admin/api-keys
-DELETE /api/admin/api-keys/{id}
-```
-
 ## 🛠️ Comandos Úteis
 
 ```bash
@@ -204,8 +172,9 @@ DELETE /api/admin/api-keys/{id}
 docker logs -f sixpet-catalog-frontend
 docker logs -f sixpet-catalog-api
 
-# Verificar deployment
-bash check-deployment.sh
+# Reiniciar serviços
+docker restart sixpet-catalog-frontend
+docker restart sixpet-catalog-api
 
 # Executar migrations
 docker exec sixpet-catalog-api alembic upgrade head
@@ -213,24 +182,21 @@ docker exec sixpet-catalog-api alembic upgrade head
 # Acessar banco
 docker exec -it sixpet-catalog-postgres psql -U sixpet -d sixpet_catalog
 
-# Reiniciar serviços
-docker restart sixpet-catalog-frontend
-docker restart sixpet-catalog-api
+# Parar tudo
+docker-compose -f docker-compose.prod.yml down
 ```
 
-Veja [COMANDOS_RAPIDOS.md](COMANDOS_RAPIDOS.md) para mais comandos.
+## 🔄 CI/CD
 
-## 🐛 Troubleshooting
+O projeto usa GitHub Actions para build automático:
 
-Execute o script de verificação:
+- **Push para main**: Gera imagens Docker versionadas
+- **Tags**: Cria releases com versionamento semântico
+- **GHCR**: Imagens publicadas no GitHub Container Registry
 
-```bash
-bash check-deployment.sh
-```
-
-Ou consulte:
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Problemas comuns
-- [DEPLOY_GUIDE.md](DEPLOY_GUIDE.md) - Guia completo
+### Imagens Disponíveis
+- `ghcr.io/sxconnect/catalog-backend:latest`
+- `ghcr.io/sxconnect/catalog-frontend:latest`
 
 ## 📈 Performance
 
@@ -256,13 +222,17 @@ MIT
 
 ## 🤝 Contribuindo
 
-Veja [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes.
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
 
 ## 📞 Suporte
 
-- 📖 Documentação: Veja os arquivos .md na raiz
-- 🐛 Issues: https://github.com/SxConnect/catalog/issues
-- 💬 Discussões: https://github.com/SxConnect/catalog/discussions
+- 🐛 **Issues**: [GitHub Issues](https://github.com/SxConnect/catalog/issues)
+- 💬 **Discussões**: [GitHub Discussions](https://github.com/SxConnect/catalog/discussions)
+- 📖 **Documentação**: Veja os arquivos específicos em cada pasta
 
 ---
 
