@@ -5,6 +5,7 @@ import re
 from app.logger import logger
 from app.utils.retry import retry_web_scraping
 from app.monitoring.metrics import monitor_scraping, monitor_enrichment
+from app.services.nutrition_parser import nutrition_parser
 import asyncio
 
 class WebEnrichmentService:
@@ -95,6 +96,29 @@ class WebEnrichmentService:
             if match:
                 data['weight'] = f"{match.group(1)} {match.group(2)}"
             
+            # Tentar extrair ingredientes
+            ingredients_patterns = [
+                r'ingredientes?[:\s]+([^.]+)',
+                r'composição[:\s]+([^.]+)',
+                r'ingredients?[:\s]+([^.]+)',
+            ]
+            
+            for pattern in ingredients_patterns:
+                match = re.search(pattern, response.text, re.IGNORECASE)
+                if match:
+                    ingredients_text = match.group(1).strip()
+                    if len(ingredients_text) > 10:  # Filtrar matches muito curtos
+                        data['ingredients_text'] = ingredients_text[:500]  # Limitar tamanho
+                        break
+            
+            # Tentar extrair informações nutricionais do HTML
+            try:
+                nutritional_info = nutrition_parser.parse_nutritional_table(response.text)
+                if nutritional_info:
+                    data['nutritional_info'] = nutritional_info
+            except Exception as e:
+                logger.debug(f"Failed to parse nutritional info from {url}: {e}")
+            
             logger.info(f"Successfully scraped data from {url}: {len(data)} fields")
             return data
             
@@ -139,7 +163,9 @@ class WebEnrichmentService:
                 "price_avg": None,
                 "weight": None,
                 "ean_confirmed": ean,
-                "sources": []
+                "sources": [],
+                "ingredients": [],
+                "nutritional_info": {}
             }
             
             prices = []
@@ -163,6 +189,19 @@ class WebEnrichmentService:
                 if data.get('weight') and not enriched_data['weight']:
                     enriched_data['weight'] = data['weight']
                 
+                # Processar ingredientes
+                if data.get('ingredients_text'):
+                    try:
+                        ingredients = nutrition_parser.parse_ingredients(data['ingredients_text'])
+                        if ingredients:
+                            enriched_data['ingredients'].extend(ingredients)
+                    except Exception as e:
+                        logger.debug(f"Failed to parse ingredients: {e}")
+                
+                # Consolidar informações nutricionais
+                if data.get('nutritional_info'):
+                    enriched_data['nutritional_info'].update(data['nutritional_info'])
+                
                 enriched_data['sources'].append(url)
             
             # Calcular preço médio
@@ -176,7 +215,14 @@ class WebEnrichmentService:
             # Remover duplicatas de imagens
             enriched_data['additional_images'] = list(set(enriched_data['additional_images']))[:5]
             
-            logger.info(f"Enrichment completed: {len(enriched_data['additional_images'])} images, price: {enriched_data['price_avg']}")
+            # Remover duplicatas de ingredientes
+            if enriched_data['ingredients']:
+                enriched_data['ingredients'] = list(set(enriched_data['ingredients']))
+            
+            logger.info(f"Enrichment completed: {len(enriched_data['additional_images'])} images, "
+                       f"price: {enriched_data['price_avg']}, "
+                       f"{len(enriched_data['ingredients'])} ingredients, "
+                       f"{len(enriched_data['nutritional_info'])} nutritional values")
             
             return enriched_data
             

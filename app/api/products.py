@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models import Product
 from app.middleware.security import rate_limit_products
 from app.utils.cache import cache_products_list, cache_search_results, invalidate_products_cache
+from app.services.nutrition_parser import nutrition_parser
 from typing import List, Optional
 import logging
 
@@ -128,3 +129,187 @@ def export_csv(db: Session = Depends(get_db)):
 def export_json(db: Session = Depends(get_db)):
     products = db.query(Product).all()
     return {"products": [p.__dict__ for p in products]}
+
+@router.get("/{product_id}/ingredients")
+@rate_limit_products()
+def get_product_ingredients(product_id: int, db: Session = Depends(get_db)):
+    """
+    Retorna ingredientes de um produto específico.
+    """
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        return {"error": "Product not found"}
+    
+    return {
+        "product_id": product_id,
+        "product_name": product.name,
+        "brand": product.brand,
+        "ingredients": product.ingredients or [],
+        "ingredients_count": len(product.ingredients) if product.ingredients else 0
+    }
+
+@router.get("/{product_id}/nutrition")
+@rate_limit_products()
+def get_product_nutrition(product_id: int, db: Session = Depends(get_db)):
+    """
+    Retorna informações nutricionais de um produto específico.
+    """
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        return {"error": "Product not found"}
+    
+    return {
+        "product_id": product_id,
+        "product_name": product.name,
+        "brand": product.brand,
+        "nutritional_info": product.nutritional_info or {},
+        "nutritional_values_count": len(product.nutritional_info) if product.nutritional_info else 0
+    }
+
+@router.get("/ingredients/search")
+@rate_limit_products()
+def search_by_ingredient(
+    ingredient: str = Query(..., min_length=2),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, le=100),
+    db: Session = Depends(get_db)
+):
+    """
+    Busca produtos que contêm um ingrediente específico.
+    """
+    # Usar operador JSON para buscar no array de ingredientes
+    query = db.query(Product).filter(
+        func.jsonb_exists(Product.ingredients, ingredient.lower())
+    )
+    
+    total = query.count()
+    products = query.offset(skip).limit(limit).all()
+    
+    return {
+        "ingredient": ingredient,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "products": products
+    }
+
+@router.get("/nutrition/compare")
+@rate_limit_products()
+def compare_nutrition(
+    product_ids: str = Query(..., description="IDs separados por vírgula, ex: 1,2,3"),
+    db: Session = Depends(get_db)
+):
+    """
+    Compara informações nutricionais entre produtos.
+    """
+    try:
+        ids = [int(id.strip()) for id in product_ids.split(',')]
+        if len(ids) > 5:
+            return {"error": "Máximo 5 produtos para comparação"}
+        
+        products = db.query(Product).filter(Product.id.in_(ids)).all()
+        
+        if not products:
+            return {"error": "Nenhum produto encontrado"}
+        
+        comparison = []
+        for product in products:
+            comparison.append({
+                "id": product.id,
+                "name": product.name,
+                "brand": product.brand,
+                "nutritional_info": product.nutritional_info or {},
+                "ingredients_count": len(product.ingredients) if product.ingredients else 0
+            })
+        
+        return {
+            "products_compared": len(comparison),
+            "comparison": comparison
+        }
+        
+    except ValueError:
+        return {"error": "IDs inválidos. Use números separados por vírgula"}
+
+@router.post("/{product_id}/parse-nutrition")
+@rate_limit_products()
+def parse_product_nutrition(
+    product_id: int,
+    html_content: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Faz parsing de informações nutricionais de HTML e atualiza o produto.
+    """
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        return {"error": "Product not found"}
+    
+    try:
+        # Fazer parsing das informações nutricionais
+        nutritional_info = nutrition_parser.parse_nutritional_table(html_content)
+        
+        if nutritional_info:
+            # Atualizar produto
+            product.nutritional_info = nutritional_info
+            db.commit()
+            
+            # Invalidar cache
+            invalidate_products_cache()
+            
+            return {
+                "success": True,
+                "product_id": product_id,
+                "nutritional_values_parsed": len(nutritional_info),
+                "nutritional_info": nutritional_info
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Nenhuma informação nutricional encontrada no HTML"
+            }
+            
+    except Exception as e:
+        logger.error(f"Error parsing nutrition for product {product_id}: {e}")
+        return {"error": f"Erro no parsing: {str(e)}"}
+
+@router.post("/{product_id}/parse-ingredients")
+@rate_limit_products()
+def parse_product_ingredients(
+    product_id: int,
+    ingredients_text: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Faz parsing de ingredientes de texto e atualiza o produto.
+    """
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        return {"error": "Product not found"}
+    
+    try:
+        # Fazer parsing dos ingredientes
+        ingredients = nutrition_parser.parse_ingredients(ingredients_text)
+        
+        if ingredients:
+            # Atualizar produto
+            product.ingredients = ingredients
+            db.commit()
+            
+            # Invalidar cache
+            invalidate_products_cache()
+            
+            return {
+                "success": True,
+                "product_id": product_id,
+                "ingredients_parsed": len(ingredients),
+                "ingredients": ingredients
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Nenhum ingrediente encontrado no texto"
+            }
+            
+    except Exception as e:
+        logger.error(f"Error parsing ingredients for product {product_id}: {e}")
+        return {"error": f"Erro no parsing: {str(e)}"}

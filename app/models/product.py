@@ -14,6 +14,8 @@ class Product(Base):
     description = Column(Text)
     images = Column(JSON)
     attributes = Column(JSON)
+    ingredients = Column(JSON)  # Lista de ingredientes normalizados
+    nutritional_info = Column(JSON)  # Informações nutricionais (proteína, gordura, etc.)
     source_catalog = Column(String(200))
     confidence_score = Column(Float)
     full_text = Column(TSVECTOR)

@@ -39,7 +39,9 @@ class AIService:
             "weight": "peso/tamanho",
             "category": "categoria",
             "description": "descrição",
-            "possible_ean": "código EAN se encontrado"
+            "possible_ean": "código EAN se encontrado",
+            "ingredients_text": "lista de ingredientes se encontrada",
+            "nutritional_text": "informações nutricionais se encontradas"
         }}
         
         Texto: {raw_text}
