@@ -2,7 +2,7 @@
 Endpoints de health check e monitoramento do sistema.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from fastapi.responses import PlainTextResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
