@@ -229,8 +229,8 @@ export default function UploadPage() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-gray-900">Upload de Catálogo</h1>
-                <p className="mt-1 text-sm text-gray-600">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Upload de Catálogo</h1>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                     Envie um catálogo em PDF para processamento automático
                 </p>
             </div>
@@ -307,14 +307,14 @@ export default function UploadPage() {
             {/* Upload Area */}
             {!catalogStatus?.is_processing && (
                 <>
-                    <div className="bg-white shadow rounded-lg p-6">
+                    <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
                         <div
                             {...getRootProps()}
                             className={`
                 border-2 border-dashed rounded-lg p-12 text-center cursor-pointer
                 transition-colors
-                ${isDragActive ? "border-primary-500 bg-primary-50" : "border-gray-300 hover:border-primary-400"}
-                ${selectedFile ? "bg-green-50 border-green-500" : ""}
+                ${isDragActive ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20" : "border-gray-300 dark:border-gray-600 hover:border-primary-400 dark:hover:border-primary-500"}
+                ${selectedFile ? "bg-green-50 dark:bg-green-900/20 border-green-500 dark:border-green-400" : ""}
               `}
                         >
                             <input {...getInputProps()} />
@@ -322,18 +322,18 @@ export default function UploadPage() {
                                 {selectedFile ? (
                                     <>
                                         <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-                                        <p className="text-lg font-medium text-gray-900">{selectedFile.name}</p>
-                                        <p className="text-sm text-gray-500 mt-1">
+                                        <p className="text-lg font-medium text-gray-900 dark:text-white">{selectedFile.name}</p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                             {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                                         </p>
                                     </>
                                 ) : (
                                     <>
                                         <Upload className="h-12 w-12 text-gray-400 mb-4" />
-                                        <p className="text-lg font-medium text-gray-900">
+                                        <p className="text-lg font-medium text-gray-900 dark:text-white">
                                             {isDragActive ? "Solte o arquivo aqui" : "Arraste um PDF ou clique para selecionar"}
                                         </p>
-                                        <p className="text-sm text-gray-500 mt-1">
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                             Apenas arquivos PDF são aceitos (máx. 100MB)
                                         </p>
                                     </>
@@ -352,13 +352,13 @@ export default function UploadPage() {
                     </div>
 
                     {/* Enrichment Options */}
-                    <div className="bg-white shadow rounded-lg p-6">
+                    <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
                         <div className="flex items-center justify-between mb-4">
                             <div>
-                                <h2 className="text-lg font-semibold text-gray-900">
+                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                     Enriquecimento de Dados
                                 </h2>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
                                     Buscar informações faltantes via web scraping
                                 </p>
                             </div>
