@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Catalog, Product
@@ -10,7 +10,7 @@ router = APIRouter()
 
 @router.get("/catalog/{catalog_id}/status")
 @rate_limit_products()
-def get_catalog_status(catalog_id: int, db: Session = Depends(get_db)):
+def get_catalog_status(request: Request, catalog_id: int, db: Session = Depends(get_db)):
     """
     Retorna status detalhado do processamento do catálogo
     Use para polling e acompanhamento em tempo real
@@ -60,6 +60,7 @@ def get_catalog_status(catalog_id: int, db: Session = Depends(get_db)):
 @router.get("/catalog/{catalog_id}/products")
 @rate_limit_products()
 def get_catalog_products(
+    request: Request,
     catalog_id: int,
     skip: int = 0,
     limit: int = 50,
@@ -88,7 +89,7 @@ def get_catalog_products(
 
 @router.get("/recent")
 @rate_limit_products()
-def get_recent_catalogs(limit: int = 10, db: Session = Depends(get_db)):
+def get_recent_catalogs(request: Request, limit: int = 10, db: Session = Depends(get_db)):
     """
     Lista catálogos recentes com status
     """
@@ -120,7 +121,7 @@ def get_recent_catalogs(limit: int = 10, db: Session = Depends(get_db)):
 
 @router.get("/stats")
 @rate_limit_products()
-def get_processing_stats(db: Session = Depends(get_db)):
+def get_processing_stats(request: Request, db: Session = Depends(get_db)):
     """
     Estatísticas gerais de processamento
     """
