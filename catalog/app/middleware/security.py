@@ -19,16 +19,18 @@ from pydantic import BaseModel, validator, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
-# Configuração do Redis para rate limiting
-redis_client = redis.Redis(host='localhost', port=6381, db=1, decode_responses=True)
+# Configuração do Redis para rate limiting usando variáveis de ambiente
+REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+redis_client = redis.from_url(REDIS_URL)
 
 # Inicializar limiter
 limiter = Limiter(
     key_func=get_remote_address,
-    storage_uri="redis://localhost:6381/1",
+    storage_uri=REDIS_URL,
     default_limits=["200 per hour"]
 )
 
