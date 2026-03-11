@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, desc, asc
 from app.database import get_db
@@ -16,6 +16,7 @@ router = APIRouter()
 @rate_limit_products()
 @cache_search_results(ttl=180)  # Cache por 3 minutos
 def search_products(
+    request: Request,
     q: Optional[str] = Query(None, min_length=2),
     brand: Optional[str] = None,
     ean: Optional[str] = None,
@@ -74,6 +75,7 @@ def search_products(
 @rate_limit_products()
 @cache_products_list(ttl=300)  # Cache por 5 minutos
 def list_products(
+    request: Request,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, le=100),
     db: Session = Depends(get_db)
@@ -83,7 +85,7 @@ def list_products(
 
 @router.get("/{product_id}")
 @rate_limit_products()
-def get_product(product_id: int, db: Session = Depends(get_db)):
+def get_product(product_id: int, request: Request, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         return {"error": "Product not found"}

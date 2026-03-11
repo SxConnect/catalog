@@ -144,6 +144,7 @@ async def upload_catalog(
 @router.get("/list")
 @rate_limit_products()
 def list_catalogs(
+    request: Request,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, le=100),
     db: Session = Depends(get_db)
@@ -159,7 +160,7 @@ def list_catalogs(
 
 @router.get("/{catalog_id}")
 @rate_limit_products()
-def get_catalog(catalog_id: int, db: Session = Depends(get_db)):
+def get_catalog(catalog_id: int, request: Request, db: Session = Depends(get_db)):
     catalog = db.query(Catalog).filter(Catalog.id == catalog_id).first()
     if not catalog:
         raise HTTPException(status_code=404, detail="Catalog not found")
