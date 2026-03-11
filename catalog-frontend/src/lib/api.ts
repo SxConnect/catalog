@@ -7,8 +7,8 @@ const getApiUrl = () => {
         return 'http://sixpet-catalog-api:8000';
     }
 
-    // No cliente, usar HTTPS primeiro
-    return 'https://catalog-api.sxconnect.com.br';
+    // No cliente, usar porta 8000 diretamente
+    return 'http://vmi2917323.contaboserver.net:8000';
 };
 
 const api = axios.create({
