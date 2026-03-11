@@ -154,6 +154,7 @@ async def import_from_sitemap(
 @router.post("/preview")
 @rate_limit_sitemap()
 async def preview_sitemap(
+    request: Request,
     sitemap_url: HttpUrl,
     url_filter: Optional[str] = None,
     max_urls: int = 10
@@ -190,7 +191,7 @@ async def preview_sitemap(
 
 @router.post("/test-scrape")
 @rate_limit_sitemap()
-async def test_scrape_url(url: HttpUrl):
+async def test_scrape_url(request: Request, url: HttpUrl):
     """
     Testa a extração de dados de uma URL específica
     Útil para verificar se o scraping está funcionando
