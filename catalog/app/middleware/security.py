@@ -91,8 +91,8 @@ else:
 class SecurityConfig:
     """Configurações de segurança."""
     
-    # Tamanho máximo de arquivo PDF (50MB)
-    MAX_PDF_SIZE = 50 * 1024 * 1024
+    # Tamanho máximo de arquivo PDF (100MB)
+    MAX_PDF_SIZE = 100 * 1024 * 1024
     
     # Extensões de arquivo permitidas
     ALLOWED_EXTENSIONS = ['.pdf']

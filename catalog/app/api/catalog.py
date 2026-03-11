@@ -24,14 +24,14 @@ router = APIRouter()
 @rate_limit_upload()
 async def upload_catalog(
     request: Request,
-    file: UploadFile = File(..., description="PDF file (max 50MB)"), 
+    file: UploadFile = File(..., description="PDF file (max 100MB)"), 
     db: Session = Depends(get_db)
 ):
     """
     Upload de catálogo PDF com validação de segurança.
     
     Rate limit: 10 requests por minuto por IP.
-    Validações: extensão .pdf, tamanho máximo 50MB, nome de arquivo seguro.
+    Validações: extensão .pdf, tamanho máximo 100MB, nome de arquivo seguro.
     """
     logger.info(f"Recebendo upload: {file.filename}")
     

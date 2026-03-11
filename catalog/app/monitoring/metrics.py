@@ -130,7 +130,7 @@ api_request_duration_seconds = Histogram(
 pdf_file_size_bytes = Histogram(
     'sixpet_pdf_file_size_bytes',
     'Tamanho dos arquivos PDF processados',
-    buckets=[1024, 10240, 102400, 1048576, 10485760, 52428800],  # 1KB to 50MB
+    buckets=[1024, 10240, 102400, 1048576, 10485760, 104857600],  # 1KB to 100MB
     registry=sixpet_registry
 )
 
