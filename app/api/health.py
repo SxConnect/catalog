@@ -2,18 +2,53 @@
 Endpoints de health check e monitoramento do sistema.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi.responses import PlainTextResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.utils.retry import get_all_circuit_breaker_stats, reset_circuit_breaker, validate_retry_config
 from app.utils.cache import CacheStats, invalidate_all_cache, invalidate_products_cache, invalidate_stats_cache, validate_cache_config
+from app.monitoring.metrics import get_prometheus_metrics, get_metrics_content_type, get_comprehensive_health_status
 from app.middleware.security import rate_limit_admin
 from typing import Dict, Any
 import redis
 import logging
+import secrets
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Autenticação básica para endpoint de métricas
+security = HTTPBasic()
+
+def verify_metrics_auth(credentials: HTTPBasicCredentials = Depends(security)):
+    """
+    Verifica autenticação básica para endpoint de métricas.
+    
+    Args:
+        credentials: Credenciais HTTP Basic
+        
+    Returns:
+        True se autenticado
+        
+    Raises:
+        HTTPException: Se credenciais inválidas
+    """
+    # TODO: Mover para variáveis de ambiente em produção
+    correct_username = "admin"
+    correct_password = "metrics123"
+    
+    is_correct_username = secrets.compare_digest(credentials.username, correct_username)
+    is_correct_password = secrets.compare_digest(credentials.password, correct_password)
+    
+    if not (is_correct_username and is_correct_password):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return True
 
 @router.get("/")
 def health_check():
@@ -303,3 +338,57 @@ def get_cache_metrics():
             "error": "Failed to get cache metrics",
             "timestamp": __import__('datetime').datetime.utcnow().isoformat()
         }
+
+@router.get("/comprehensive")
+@rate_limit_admin()
+def get_comprehensive_health():
+    """
+    Health check abrangente com todas as informações do sistema.
+    
+    Returns:
+        Status detalhado de todos os componentes, métricas e alertas
+    """
+    try:
+        health_status = get_comprehensive_health_status()
+        return health_status
+    except Exception as e:
+        logger.error(f"Error getting comprehensive health status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/monitoring")
+@rate_limit_admin()
+def get_monitoring_status():
+    """
+    Status específico do sistema de monitoramento.
+    
+    Returns:
+        Informações sobre coleta de métricas e instrumentação
+    """
+    try:
+        from app.monitoring.metrics import metrics_collector
+        
+        # Coletar métricas atuais
+        metrics_collector.collect_all_metrics()
+        
+        return {
+            "status": "active",
+            "metrics_collected": True,
+            "prometheus_endpoint": "/metrics",
+            "authentication": "basic_auth_required",
+            "collectors": {
+                "system_metrics": True,
+                "cache_metrics": True,
+                "circuit_breaker_metrics": True,
+                "database_metrics": True
+            },
+            "instrumentation": {
+                "api_requests": True,
+                "pdf_extraction": True,
+                "web_scraping": True,
+                "enrichment": True
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting monitoring status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

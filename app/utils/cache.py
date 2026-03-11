@@ -19,6 +19,13 @@ logger = logging.getLogger(__name__)
 # Configuração do Redis para cache
 cache_redis = redis.Redis(host='localhost', port=6381, db=3, decode_responses=False)
 
+# Import das métricas (com fallback se não disponível)
+try:
+    from app.monitoring.metrics import record_cache_operation
+except ImportError:
+    def record_cache_operation(operation: str, result: str):
+        pass  # Fallback silencioso se métricas não disponíveis
+
 class CacheConfig:
     """Configurações de cache."""
     
@@ -211,10 +218,16 @@ def cached(
                 cached_data = cache_redis.get(cache_key)
                 if cached_data is not None:
                     logger.debug(f"Cache HIT for key: {cache_key}")
+                    # Registrar cache hit
+                    from app.monitoring.metrics import record_cache_operation
+                    record_cache_operation("get", "hit")
                     return _deserialize_value(cached_data)
                 
                 # Cache miss - executar função
                 logger.debug(f"Cache MISS for key: {cache_key}")
+                # Registrar cache miss
+                from app.monitoring.metrics import record_cache_operation
+                record_cache_operation("get", "miss")
                 result = func(*args, **kwargs)
                 
                 # Armazenar no cache
@@ -222,11 +235,16 @@ def cached(
                     serialized = _serialize_value(result)
                     cache_redis.setex(cache_key, ttl, serialized)
                     logger.debug(f"Cached result for key: {cache_key} (TTL: {ttl}s)")
+                    # Registrar cache set
+                    record_cache_operation("set", "success")
                 
                 return result
                 
             except Exception as e:
                 logger.error(f"Cache error for key {cache_key}: {e}")
+                # Registrar erro de cache
+                from app.monitoring.metrics import record_cache_operation
+                record_cache_operation("get", "error")
                 # Em caso de erro no cache, executar função normalmente
                 return func(*args, **kwargs)
         

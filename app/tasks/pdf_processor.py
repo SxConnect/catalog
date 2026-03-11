@@ -8,10 +8,19 @@ from app.services.normalizer import normalize_product_name, normalize_brand, nor
 from app.database import SessionLocal
 from app.models import Catalog, Product, Settings
 from app.logger import logger, log_catalog_event, log_error
+from app.monitoring.metrics import (
+    monitor_pdf_extraction, 
+    record_product_processed, 
+    record_product_duplicate,
+    record_catalog_upload,
+    record_pdf_size,
+    update_queue_size
+)
 from pathlib import Path
 import time
 
 @celery_app.task
+@monitor_pdf_extraction
 def process_pdf_task(catalog_id: int, pdf_path: str):
     db = SessionLocal()
     start_time = time.time()
@@ -19,9 +28,17 @@ def process_pdf_task(catalog_id: int, pdf_path: str):
     try:
         log_catalog_event(catalog_id, f"Starting PDF processing: {pdf_path}")
         
+        # Registrar tamanho do arquivo PDF
+        pdf_file = Path(pdf_path)
+        if pdf_file.exists():
+            file_size = pdf_file.stat().st_size
+            record_pdf_size(file_size)
+            log_catalog_event(catalog_id, f"PDF file size: {file_size} bytes")
+        
         catalog = db.query(Catalog).filter(Catalog.id == catalog_id).first()
         if not catalog:
             log_catalog_event(catalog_id, "Catalog not found", "error")
+            record_catalog_upload("failed")
             return
         
         catalog.status = "processing"

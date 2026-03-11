@@ -11,6 +11,7 @@ from app.middleware.security import (
     log_security_event
 )
 from app.utils.cache import invalidate_products_cache, invalidate_stats_cache
+from app.monitoring.metrics import record_catalog_upload, record_pdf_size
 import shutil
 from pathlib import Path
 import logging
@@ -45,6 +46,9 @@ async def upload_catalog(
         
         # Validar arquivo usando SecurityValidator
         SecurityValidator.validate_pdf_file(file.filename, file_size)
+        
+        # Registrar tamanho do arquivo para métricas
+        record_pdf_size(file_size)
         
         # Log evento de segurança
         log_security_event(
@@ -109,6 +113,9 @@ async def upload_catalog(
         invalidate_stats_cache()
         logger.info("Cache invalidated after catalog upload")
         
+        # Registrar upload bem-sucedido
+        record_catalog_upload("success")
+        
         process_pdf_task.delay(catalog.id, str(file_path))
         
         return {"catalog_id": catalog.id, "status": "processing"}
@@ -118,6 +125,9 @@ async def upload_catalog(
         file_path.unlink(missing_ok=True)
         db.delete(catalog)
         db.commit()
+        
+        # Registrar upload falhado
+        record_catalog_upload("failed")
         
         # Log evento de erro
         log_security_event(

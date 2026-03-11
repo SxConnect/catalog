@@ -3,6 +3,7 @@ import json
 from typing import Dict, Optional
 from app.services.api_key_manager import ApiKeyManager
 from app.utils.retry import retry_groq_api
+from app.monitoring.metrics import record_groq_error, record_product_processed
 import logging
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,15 @@ class AIService:
             
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON response from Groq API: {e}")
+            record_groq_error("json_decode_error")
             return None
         except Exception as e:
             logger.error(f"Groq API error: {e}")
+            # Registrar tipo de erro específico
+            if "rate limit" in str(e).lower():
+                record_groq_error("rate_limit")
+            elif "timeout" in str(e).lower():
+                record_groq_error("timeout")
+            else:
+                record_groq_error("api_error")
             raise  # Re-raise para que o retry funcione

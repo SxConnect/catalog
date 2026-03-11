@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from app.logger import logger
 from app.services.normalizer import normalize_product_name, normalize_brand, normalize_ean
 from app.utils.retry import retry_web_scraping
+from app.monitoring.metrics import monitor_scraping
 import asyncio
 import re
 
@@ -54,6 +55,7 @@ class SitemapService:
             return []
     
     @retry_web_scraping(max_attempts=5)
+    @monitor_scraping
     async def scrape_product_page(self, url: str) -> Optional[Dict]:
         """
         Extrai dados de produto de uma página específica com retry automático.

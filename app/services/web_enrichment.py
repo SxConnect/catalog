@@ -4,6 +4,7 @@ from typing import Dict, Optional, List
 import re
 from app.logger import logger
 from app.utils.retry import retry_web_scraping
+from app.monitoring.metrics import monitor_scraping, monitor_enrichment
 import asyncio
 
 class WebEnrichmentService:
@@ -29,6 +30,7 @@ class WebEnrichmentService:
             return []
     
     @retry_web_scraping(max_attempts=5)
+    @monitor_scraping
     async def scrape_product_page(self, url: str) -> Dict:
         """
         Extrai dados de uma página de produto com retry automático e circuit breaker.
@@ -100,6 +102,7 @@ class WebEnrichmentService:
             logger.error(f"Scraping error for {url}: {e}")
             raise  # Re-raise para que o retry funcione
     
+    @monitor_enrichment
     async def search_product(
         self, 
         product_name: str, 
