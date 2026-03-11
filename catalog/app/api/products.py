@@ -93,7 +93,7 @@ def get_product(product_id: int, request: Request, db: Session = Depends(get_db)
 
 @router.get("/export/csv")
 @rate_limit_products()
-def export_csv(db: Session = Depends(get_db)):
+def export_csv(request: Request, db: Session = Depends(get_db)):
     import csv
     import io
     from fastapi.responses import StreamingResponse
@@ -128,13 +128,13 @@ def export_csv(db: Session = Depends(get_db)):
 
 @router.get("/export/json")
 @rate_limit_products()
-def export_json(db: Session = Depends(get_db)):
+def export_json(request: Request, db: Session = Depends(get_db)):
     products = db.query(Product).all()
     return {"products": [p.__dict__ for p in products]}
 
 @router.get("/{product_id}/ingredients")
 @rate_limit_products()
-def get_product_ingredients(product_id: int, db: Session = Depends(get_db)):
+def get_product_ingredients(request: Request, product_id: int, db: Session = Depends(get_db)):
     """
     Retorna ingredientes de um produto específico.
     """
@@ -152,7 +152,7 @@ def get_product_ingredients(product_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{product_id}/nutrition")
 @rate_limit_products()
-def get_product_nutrition(product_id: int, db: Session = Depends(get_db)):
+def get_product_nutrition(request: Request, product_id: int, db: Session = Depends(get_db)):
     """
     Retorna informações nutricionais de um produto específico.
     """
@@ -171,6 +171,7 @@ def get_product_nutrition(product_id: int, db: Session = Depends(get_db)):
 @router.get("/ingredients/search")
 @rate_limit_products()
 def search_by_ingredient(
+    request: Request,
     ingredient: str = Query(..., min_length=2),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, le=100),
@@ -198,6 +199,7 @@ def search_by_ingredient(
 @router.get("/nutrition/compare")
 @rate_limit_products()
 def compare_nutrition(
+    request: Request,
     product_ids: str = Query(..., description="IDs separados por vírgula, ex: 1,2,3"),
     db: Session = Depends(get_db)
 ):
@@ -235,6 +237,7 @@ def compare_nutrition(
 @router.post("/{product_id}/parse-nutrition")
 @rate_limit_products()
 def parse_product_nutrition(
+    request: Request,
     product_id: int,
     html_content: str,
     db: Session = Depends(get_db)
@@ -277,6 +280,7 @@ def parse_product_nutrition(
 @router.post("/{product_id}/parse-ingredients")
 @rate_limit_products()
 def parse_product_ingredients(
+    request: Request,
     product_id: int,
     ingredients_text: str,
     db: Session = Depends(get_db)
@@ -319,6 +323,7 @@ def parse_product_ingredients(
 @router.put("/{product_id}")
 @rate_limit_products()
 def update_product(
+    request: Request,
     product_id: int,
     product_data: dict,
     db: Session = Depends(get_db)

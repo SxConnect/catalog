@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.deduplication_service import DeduplicationService
@@ -14,6 +14,7 @@ router = APIRouter()
 @rate_limit_products()
 @cache_deduplication_by_ean(ttl=86400)  # Cache por 24 horas
 def check_duplicate(
+    request: Request,
     name: str = Query(..., min_length=2),
     brand: str = Query(..., min_length=2),
     ean: Optional[str] = None,
@@ -42,6 +43,7 @@ def check_duplicate(
 @router.get("/similar")
 @rate_limit_products()
 def find_similar(
+    request: Request,
     name: str = Query(..., min_length=2),
     brand: str = Query(..., min_length=2),
     ean: Optional[str] = None,
@@ -74,6 +76,7 @@ def find_similar(
 @router.get("/find-all")
 @rate_limit_products()
 def find_all_duplicates(
+    request: Request,
     threshold: float = Query(0.85, ge=0.0, le=1.0),
     limit: int = Query(100, le=1000),
     db: Session = Depends(get_db)
@@ -107,6 +110,7 @@ def find_all_duplicates(
 @router.post("/merge")
 @rate_limit_admin()
 def merge_duplicates(
+    request: Request,
     keep_id: int,
     remove_id: int,
     db: Session = Depends(get_db)

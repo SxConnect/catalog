@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
@@ -13,7 +13,7 @@ router = APIRouter()
 @router.get("/stats")
 @rate_limit_admin()
 @cache_dashboard_stats(ttl=60)  # Cache por 1 minuto
-def get_stats(db: Session = Depends(get_db)):
+def get_stats(request: Request, db: Session = Depends(get_db)):
     total_catalogs = db.query(func.count(Catalog.id)).scalar()
     total_products = db.query(func.count(Product.id)).scalar()
     processing = db.query(func.count(Catalog.id)).filter(
@@ -28,7 +28,7 @@ def get_stats(db: Session = Depends(get_db)):
 
 @router.get("/api-keys")
 @rate_limit_admin()
-def list_api_keys(db: Session = Depends(get_db)):
+def list_api_keys(request: Request, db: Session = Depends(get_db)):
     keys = db.query(ApiKey).all()
     return keys
 
@@ -42,6 +42,7 @@ class ApiKeyCreate(BaseModel):
 @router.post("/api-keys")
 @rate_limit_admin()
 def create_api_key(
+    request: Request,
     data: ApiKeyCreate,
     db: Session = Depends(get_db)
 ):
@@ -67,7 +68,7 @@ def create_api_key(
 
 @router.delete("/api-keys/{key_id}")
 @rate_limit_admin()
-def delete_api_key(key_id: int, db: Session = Depends(get_db)):
+def delete_api_key(request: Request, key_id: int, db: Session = Depends(get_db)):
     """Remove uma API key"""
     api_key = db.query(ApiKey).filter(ApiKey.id == key_id).first()
     if not api_key:
@@ -80,7 +81,7 @@ def delete_api_key(key_id: int, db: Session = Depends(get_db)):
 
 @router.get("/queue/status")
 @rate_limit_admin()
-def queue_status():
+def queue_status(request: Request):
     return {"message": "Queue status endpoint"}
 
 from app.models import Settings
@@ -98,7 +99,7 @@ class SettingsUpdate(BaseModel):
 
 @router.get("/settings")
 @rate_limit_admin()
-def get_settings(db: Session = Depends(get_db)):
+def get_settings(request: Request, db: Session = Depends(get_db)):
     """Retorna todas as configurações do sistema"""
     settings_dict = {}
     
@@ -123,7 +124,7 @@ def get_settings(db: Session = Depends(get_db)):
 
 @router.put("/settings")
 @rate_limit_admin()
-def update_settings(data: SettingsUpdate, db: Session = Depends(get_db)):
+def update_settings(request: Request, data: SettingsUpdate, db: Session = Depends(get_db)):
     """Atualiza as configurações do sistema"""
     settings_data = {
         "groq_api_keys": ("string", data.groq_api_keys),

@@ -66,7 +66,7 @@ def health_check():
 
 @router.get("/circuit-breakers")
 @rate_limit_admin()
-def get_circuit_breaker_status():
+def get_circuit_breaker_status(request: Request):
     """
     Retorna status de todos os circuit breakers.
     
@@ -91,7 +91,7 @@ def get_circuit_breaker_status():
 
 @router.post("/circuit-breakers/{name}/reset")
 @rate_limit_admin()
-def reset_circuit_breaker_endpoint(name: str):
+def reset_circuit_breaker_endpoint(request: Request, name: str):
     """
     Reseta um circuit breaker específico.
     
@@ -121,7 +121,7 @@ def reset_circuit_breaker_endpoint(name: str):
 
 @router.get("/services")
 @rate_limit_admin()
-def get_services_status(db: Session = Depends(get_db)):
+def get_services_status(request: Request, db: Session = Depends(get_db)):
     """
     Verifica status de todos os serviços dependentes.
     
@@ -246,7 +246,7 @@ def get_basic_metrics(db: Session = Depends(get_db)):
 
 @router.get("/cache")
 @rate_limit_admin()
-def get_cache_status():
+def get_cache_status(request: Request):
     """
     Retorna status e estatísticas do cache Redis.
     
@@ -273,6 +273,7 @@ def get_cache_status():
 @router.post("/cache/invalidate")
 @rate_limit_admin()
 def invalidate_cache(
+    request: Request,
     cache_type: str = Query(..., pattern="^(all|products|stats)$")
 ):
     """
@@ -341,7 +342,7 @@ def get_cache_metrics():
 
 @router.get("/comprehensive")
 @rate_limit_admin()
-def get_comprehensive_health():
+def get_comprehensive_health(request: Request):
     """
     Health check abrangente com todas as informações do sistema.
     
@@ -357,7 +358,7 @@ def get_comprehensive_health():
 
 @router.get("/monitoring")
 @rate_limit_admin()
-def get_monitoring_status():
+def get_monitoring_status(request: Request):
     """
     Status específico do sistema de monitoramento.
     

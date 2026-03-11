@@ -171,6 +171,7 @@ def get_catalog(catalog_id: int, request: Request, db: Session = Depends(get_db)
 async def control_catalog_processing(
     catalog_id: int,
     control_data: dict,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
