@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from typing import Dict, Optional, List
 import re
 from app.logger import logger
+from app.utils.retry import retry_web_scraping
 import asyncio
 
 class WebEnrichmentService:
@@ -27,10 +28,22 @@ class WebEnrichmentService:
             logger.error(f"Google search error: {e}")
             return []
     
+    @retry_web_scraping(max_attempts=5)
     async def scrape_product_page(self, url: str) -> Dict:
-        """Extrai dados de uma página de produto"""
+        """
+        Extrai dados de uma página de produto com retry automático e circuit breaker.
+        
+        Args:
+            url: URL da página do produto
+            
+        Returns:
+            Dicionário com dados extraídos da página
+        """
         try:
+            logger.debug(f"Scraping product page: {url}")
             response = await self.client.get(url, headers=self.headers)
+            response.raise_for_status()  # Levanta exceção para status HTTP de erro
+            
             soup = BeautifulSoup(response.text, 'html.parser')
             
             data = {}
@@ -80,11 +93,12 @@ class WebEnrichmentService:
             if match:
                 data['weight'] = f"{match.group(1)} {match.group(2)}"
             
+            logger.info(f"Successfully scraped data from {url}: {len(data)} fields")
             return data
             
         except Exception as e:
             logger.error(f"Scraping error for {url}: {e}")
-            return {}
+            raise  # Re-raise para que o retry funcione
     
     async def search_product(
         self, 

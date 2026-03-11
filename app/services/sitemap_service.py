@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 import xml.etree.ElementTree as ET
 from app.logger import logger
 from app.services.normalizer import normalize_product_name, normalize_brand, normalize_ean
+from app.utils.retry import retry_web_scraping
 import asyncio
 import re
 
@@ -52,12 +53,19 @@ class SitemapService:
             logger.error(f"Error fetching sitemap: {e}")
             return []
     
+    @retry_web_scraping(max_attempts=5)
     async def scrape_product_page(self, url: str) -> Optional[Dict]:
         """
-        Extrai dados de produto de uma página específica
+        Extrai dados de produto de uma página específica com retry automático.
+        
+        Args:
+            url: URL da página do produto
+            
+        Returns:
+            Dicionário com dados do produto ou None se falhar
         """
         try:
-            logger.info(f"Scraping product: {url}")
+            logger.debug(f"Scraping product: {url}")
             response = await self.client.get(url, headers=self.headers)
             response.raise_for_status()
             
