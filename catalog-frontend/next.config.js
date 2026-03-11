@@ -3,7 +3,7 @@ const nextConfig = {
     async rewrites() {
         return [
             {
-                source: '/api-proxy/:path*',
+                source: '/api/:path*',
                 destination: 'http://sixpet-catalog-api:8000/api/:path*',
             },
         ];
