@@ -371,7 +371,10 @@ def custom_rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
             error_detail = str(exc)
         
         # Log do evento
-        client_ip = getattr(request, 'client', {}).get('host', 'unknown') if request else 'unknown'
+        client_ip = "unknown"
+        if request and hasattr(request, 'client') and request.client:
+            client_ip = request.client.host if hasattr(request.client, 'host') else str(request.client)
+        
         logger.warning(f"Rate limit/Auth error for {client_ip}: {error_detail}")
         
         # Resposta padronizada
