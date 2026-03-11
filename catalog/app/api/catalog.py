@@ -6,6 +6,7 @@ from app.models.catalog import CatalogStatus
 from app.tasks.pdf_processor import process_pdf_task
 from app.middleware.security import (
     rate_limit_upload, 
+    rate_limit_products,
     SecurityValidator, 
     FileValidationError,
     log_security_event
