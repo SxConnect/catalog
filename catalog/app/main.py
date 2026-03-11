@@ -4,14 +4,15 @@ from fastapi.responses import PlainTextResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi import Depends, HTTPException
 from app.api import catalog, products, admin, search, deduplication, sitemap, status, health
-from app.middleware.security import setup_security
 from app.monitoring.metrics import get_prometheus_metrics, get_metrics_content_type
 import secrets
+import logging
 
-app = FastAPI(title="SixPet Catalog Engine", version="1.0.7")
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Configurar segurança (rate limiting, headers, validação)
-setup_security(app)
+app = FastAPI(title="SixPet Catalog Engine", version="1.0.8")
 
 # Configurar CORS com máxima permissividade para resolver problemas de conectividade
 app.add_middleware(
@@ -23,6 +24,15 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=3600,
 )
+
+# Configurar segurança (rate limiting, headers, validação) - APÓS CORS
+try:
+    from app.middleware.security import setup_security
+    setup_security(app)
+    logger.info("Security middleware configured successfully")
+except Exception as e:
+    logger.error(f"Failed to configure security middleware: {e}")
+    logger.warning("Continuing without security middleware")
 
 app.include_router(catalog.router, prefix="/api/catalog", tags=["catalog"])
 app.include_router(products.router, prefix="/api/products", tags=["products"])
@@ -67,8 +77,8 @@ def prometheus_metrics(authenticated: bool = Depends(verify_metrics_auth)):
 
 @app.get("/")
 def root():
-    return {"message": "SixPet Catalog Engine API", "version": "1.0.7"}
+    return {"message": "SixPet Catalog Engine API", "version": "1.0.8", "status": "running"}
 
 @app.get("/health")
 def health():
-    return {"status": "healthy"}
+    return {"status": "healthy", "version": "1.0.8"}

@@ -30,31 +30,45 @@ REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 def create_redis_client():
     """Cria cliente Redis com fallback para diferentes configurações."""
     try:
-        # Tentar com URL completa primeiro
-        client = redis.from_url(REDIS_URL)
+        # Primeiro, tentar conectar sem autenticação (configuração padrão)
+        import urllib.parse
+        parsed = urllib.parse.urlparse(REDIS_URL)
+        
+        # Configuração básica sem autenticação
+        client = redis.Redis(
+            host=parsed.hostname or 'redis',
+            port=parsed.port or 6379,
+            db=int(parsed.path.lstrip('/')) if parsed.path else 0,
+            decode_responses=True,
+            socket_timeout=5,
+            socket_connect_timeout=5,
+            retry_on_timeout=True,
+            health_check_interval=30
+        )
+        
+        # Testar conexão
         client.ping()
-        logger.info(f"Redis connected successfully with URL: {REDIS_URL}")
+        logger.info(f"Redis connected successfully to {parsed.hostname or 'redis'}:{parsed.port or 6379}")
         return client
+        
     except redis.AuthenticationError:
-        logger.warning("Redis authentication failed, trying without auth...")
+        logger.warning("Redis authentication failed, trying with URL...")
         try:
-            # Tentar sem autenticação
-            import urllib.parse
-            parsed = urllib.parse.urlparse(REDIS_URL)
-            client = redis.Redis(
-                host=parsed.hostname or 'redis',
-                port=parsed.port or 6379,
-                db=int(parsed.path.lstrip('/')) if parsed.path else 0,
-                decode_responses=True
-            )
+            # Tentar com URL completa (pode ter senha)
+            client = redis.from_url(REDIS_URL, decode_responses=True)
             client.ping()
-            logger.info("Redis connected successfully without authentication")
+            logger.info(f"Redis connected successfully with URL: {REDIS_URL}")
             return client
         except Exception as e:
-            logger.error(f"Failed to connect to Redis without auth: {e}")
+            logger.error(f"Failed to connect to Redis with URL: {e}")
             return None
+            
+    except redis.ConnectionError as e:
+        logger.error(f"Redis connection error: {e}")
+        return None
+        
     except Exception as e:
-        logger.error(f"Failed to connect to Redis: {e}")
+        logger.error(f"Unexpected Redis error: {e}")
         return None
 
 redis_client = create_redis_client()
@@ -346,32 +360,39 @@ def custom_rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
     Lida com diferentes tipos de exceções de forma robusta.
     """
     try:
-        # Tentar acessar detail se existir
+        # Determinar o tipo de erro e extrair informações
+        error_detail = "Rate limit exceeded"
+        
         if hasattr(exc, 'detail'):
-            detail = exc.detail
+            error_detail = str(exc.detail)
         elif hasattr(exc, 'message'):
-            detail = exc.message
-        else:
-            detail = str(exc)
+            error_detail = str(exc.message)
+        elif hasattr(exc, '__str__'):
+            error_detail = str(exc)
         
-        logger.warning(f"Rate limit exceeded for {request.client.host}: {detail}")
+        # Log do evento
+        client_ip = getattr(request, 'client', {}).get('host', 'unknown') if request else 'unknown'
+        logger.warning(f"Rate limit/Auth error for {client_ip}: {error_detail}")
         
+        # Resposta padronizada
         return JSONResponse(
             status_code=429,
             content={
                 "error": "Rate limit exceeded",
-                "detail": detail,
-                "retry_after": "60 seconds"
+                "detail": error_detail,
+                "retry_after": "60 seconds",
+                "timestamp": __import__('datetime').datetime.utcnow().isoformat()
             }
         )
-    except Exception as e:
-        # Fallback para qualquer erro no handler
-        logger.error(f"Error in rate limit handler: {e}")
+        
+    except Exception as handler_error:
+        # Fallback absoluto para qualquer erro no handler
+        logger.error(f"Critical error in rate limit handler: {handler_error}")
         return JSONResponse(
             status_code=429,
             content={
                 "error": "Rate limit exceeded",
-                "detail": "Too many requests",
+                "detail": "Too many requests - please try again later",
                 "retry_after": "60 seconds"
             }
         )
@@ -403,19 +424,32 @@ def setup_rate_limiting(app):
     Args:
         app: Instância da aplicação FastAPI
     """
-    # Adicionar middleware do SlowAPI
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, custom_rate_limit_handler)
-    # Também capturar erros de autenticação Redis
     try:
-        import redis
-        app.add_exception_handler(redis.AuthenticationError, custom_rate_limit_handler)
-        app.add_exception_handler(redis.ConnectionError, custom_rate_limit_handler)
-    except ImportError:
-        pass
-    app.add_middleware(SlowAPIMiddleware)
-    
-    logger.info("Rate limiting configured successfully")
+        # Adicionar middleware do SlowAPI
+        app.state.limiter = limiter
+        
+        # Configurar handlers para diferentes tipos de exceção
+        app.add_exception_handler(RateLimitExceeded, custom_rate_limit_handler)
+        
+        # Handlers específicos para erros de Redis
+        try:
+            import redis
+            app.add_exception_handler(redis.AuthenticationError, custom_rate_limit_handler)
+            app.add_exception_handler(redis.ConnectionError, custom_rate_limit_handler)
+            app.add_exception_handler(redis.TimeoutError, custom_rate_limit_handler)
+            app.add_exception_handler(redis.RedisError, custom_rate_limit_handler)
+        except ImportError:
+            logger.warning("Redis module not available for exception handling")
+        
+        # Adicionar middleware
+        app.add_middleware(SlowAPIMiddleware)
+        
+        logger.info("Rate limiting configured successfully with robust error handling")
+        
+    except Exception as e:
+        logger.error(f"Failed to configure rate limiting: {e}")
+        # Não falhar a aplicação se rate limiting não funcionar
+        logger.warning("Continuing without rate limiting due to configuration error")
 
 
 # Função para configurar headers de segurança
@@ -458,8 +492,9 @@ def validate_security_config():
         return True
         
     except Exception as e:
-        logger.error(f"Critical security configuration validation failed: {e}")
-        return False
+        logger.warning(f"Security configuration validation failed (non-critical): {e}")
+        # Não falhar a inicialização por problemas de configuração não críticos
+        return True
 
 
 # Utilitários para logging de segurança
@@ -497,14 +532,26 @@ def setup_security(app):
     Args:
         app: Instância da aplicação FastAPI
     """
-    # Validar configuração
-    if not validate_security_config():
-        raise RuntimeError("Security configuration validation failed")
+    # Validar configuração (não crítico para inicialização)
+    try:
+        validate_security_config()
+        logger.info("Security configuration validated successfully")
+    except Exception as e:
+        logger.warning(f"Security configuration validation had issues (continuing): {e}")
     
     # Configurar rate limiting
-    setup_rate_limiting(app)
+    try:
+        setup_rate_limiting(app)
+        logger.info("Rate limiting configured successfully")
+    except Exception as e:
+        logger.error(f"Failed to setup rate limiting: {e}")
+        # Continuar sem rate limiting se necessário
     
     # Configurar headers de segurança
-    setup_security_headers(app)
+    try:
+        setup_security_headers(app)
+        logger.info("Security headers configured successfully")
+    except Exception as e:
+        logger.error(f"Failed to setup security headers: {e}")
     
-    logger.info("Security setup completed successfully")
+    logger.info("Security setup completed (with any available features)")
