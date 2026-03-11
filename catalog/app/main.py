@@ -13,20 +13,11 @@ app = FastAPI(title="SixPet Catalog Engine", version="1.0.7")
 # Configurar segurança (rate limiting, headers, validação)
 setup_security(app)
 
-# Configurar CORS com mais permissividade para resolver problemas de conectividade
+# Configurar CORS com máxima permissividade para resolver problemas de conectividade
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://catalog.sxconnect.com.br",
-        "https://catalog-api.sxconnect.com.br",
-        "http://catalog.sxconnect.com.br",
-        "http://catalog-api.sxconnect.com.br",
-        # Adicionar origens internas dos containers
-        "http://frontend:3000",
-        "http://api:8000"
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],  # Permitir todas as origens temporariamente
+    allow_credentials=False,  # Desabilitar credentials quando allow_origins=["*"]
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
     allow_headers=["*"],
     expose_headers=["*"],

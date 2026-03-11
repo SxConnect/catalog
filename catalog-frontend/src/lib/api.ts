@@ -17,8 +17,8 @@ const api = axios.create({
     headers: {
         "Content-Type": "application/json",
     },
-    timeout: 15000, // 15 segundos de timeout
-    // Adicionar configurações para resolver problemas de CORS
+    timeout: 30000, // 30 segundos de timeout (aumentado)
+    // Configurações para resolver problemas de CORS
     withCredentials: false,
 });
 
@@ -47,8 +47,12 @@ api.interceptors.response.use(
 // Interceptor para adicionar headers necessários
 api.interceptors.request.use(
     (config) => {
-        // Adicionar headers para resolver problemas de CORS
-        config.headers['Access-Control-Allow-Origin'] = '*';
+        // Log da requisição para debug
+        console.log('API Request:', {
+            url: config.url,
+            method: config.method,
+            baseURL: config.baseURL
+        });
         return config;
     },
     (error) => {
