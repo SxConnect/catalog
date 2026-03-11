@@ -163,3 +163,76 @@ def get_catalog(catalog_id: int, db: Session = Depends(get_db)):
     if not catalog:
         raise HTTPException(status_code=404, detail="Catalog not found")
     return catalog
+
+@router.post("/{catalog_id}/control")
+@rate_limit_upload()
+async def control_catalog_processing(
+    catalog_id: int,
+    control_data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Controla o processamento de um catálogo (pause, resume, stop, restart).
+    """
+    catalog = db.query(Catalog).filter(Catalog.id == catalog_id).first()
+    if not catalog:
+        raise HTTPException(status_code=404, detail="Catalog not found")
+    
+    action = control_data.get("action")
+    if action not in ["pause", "resume", "stop", "restart"]:
+        raise HTTPException(status_code=400, detail="Invalid action")
+    
+    try:
+        if action == "pause":
+            if catalog.status != CatalogStatus.PROCESSING:
+                raise HTTPException(status_code=400, detail="Catalog is not processing")
+            
+            catalog.status = CatalogStatus.PAUSED
+            db.commit()
+            
+            # TODO: Implementar pausa real do worker Celery
+            logger.info(f"Catalog {catalog_id} paused")
+            
+        elif action == "resume":
+            if catalog.status != CatalogStatus.PAUSED:
+                raise HTTPException(status_code=400, detail="Catalog is not paused")
+            
+            catalog.status = CatalogStatus.PROCESSING
+            db.commit()
+            
+            # TODO: Implementar retomada do worker Celery
+            logger.info(f"Catalog {catalog_id} resumed")
+            
+        elif action == "stop":
+            if catalog.status not in [CatalogStatus.PROCESSING, CatalogStatus.PAUSED]:
+                raise HTTPException(status_code=400, detail="Catalog is not processing or paused")
+            
+            catalog.status = CatalogStatus.FAILED
+            db.commit()
+            
+            # TODO: Implementar parada do worker Celery
+            logger.info(f"Catalog {catalog_id} stopped")
+            
+        elif action == "restart":
+            if catalog.status not in [CatalogStatus.FAILED, CatalogStatus.COMPLETED]:
+                raise HTTPException(status_code=400, detail="Catalog cannot be restarted")
+            
+            # Reset progress
+            catalog.status = CatalogStatus.PROCESSING
+            catalog.processed_pages = 0
+            catalog.products_found = 0
+            db.commit()
+            
+            # TODO: Reiniciar processamento
+            logger.info(f"Catalog {catalog_id} restarted")
+        
+        return {
+            "success": True,
+            "action": action,
+            "catalog_id": catalog_id,
+            "new_status": catalog.status.value
+        }
+        
+    except Exception as e:
+        logger.error(f"Error controlling catalog {catalog_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error controlling catalog: {str(e)}")

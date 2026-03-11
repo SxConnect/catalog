@@ -52,6 +52,7 @@ def get_catalog_status(catalog_id: int, db: Session = Depends(get_db)):
         "updated_at": catalog.updated_at.isoformat() if catalog.updated_at else None,
         "estimated_time_remaining_seconds": estimated_time_remaining,
         "is_processing": catalog.status == "processing",
+        "is_paused": catalog.status == "paused",
         "is_completed": catalog.status == "completed",
         "is_failed": catalog.status == "failed"
     }
@@ -125,6 +126,7 @@ def get_processing_stats(db: Session = Depends(get_db)):
     """
     total_catalogs = db.query(Catalog).count()
     processing = db.query(Catalog).filter(Catalog.status == "processing").count()
+    paused = db.query(Catalog).filter(Catalog.status == "paused").count()
     completed = db.query(Catalog).filter(Catalog.status == "completed").count()
     failed = db.query(Catalog).filter(Catalog.status == "failed").count()
     total_products = db.query(Product).count()
@@ -132,6 +134,7 @@ def get_processing_stats(db: Session = Depends(get_db)):
     return {
         "total_catalogs": total_catalogs,
         "processing": processing,
+        "paused": paused,
         "completed": completed,
         "failed": failed,
         "total_products": total_products

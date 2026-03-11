@@ -6,6 +6,7 @@ from app.database import Base
 class CatalogStatus(str, enum.Enum):
     UPLOADED = "uploaded"
     PROCESSING = "processing"
+    PAUSED = "paused"
     COMPLETED = "completed"
     FAILED = "failed"
     
