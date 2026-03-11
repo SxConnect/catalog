@@ -28,7 +28,9 @@ import redis
 logger = logging.getLogger(__name__)
 
 # Configuração do Redis para circuit breaker
-redis_client = redis.Redis(host='localhost', port=6381, db=2, decode_responses=True)
+import os
+REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+redis_client = redis.from_url(REDIS_URL)
 
 
 class CircuitBreakerState(Enum):

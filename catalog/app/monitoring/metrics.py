@@ -487,7 +487,9 @@ class MetricsCollector:
     def __init__(self):
         self.redis_client = None
         try:
-            self.redis_client = redis.Redis(host='localhost', port=6381, db=0, decode_responses=True)
+            import os
+            REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+            self.redis_client = redis.from_url(REDIS_URL)
         except Exception as e:
             logger.warning(f"Could not connect to Redis for metrics: {e}")
     

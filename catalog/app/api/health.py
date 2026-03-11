@@ -147,7 +147,9 @@ def get_services_status(request: Request, db: Session = Depends(get_db)):
     
     # Verificar Redis
     try:
-        redis_client = redis.Redis(host='localhost', port=6381, db=0, decode_responses=True)
+        import os
+        REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+        redis_client = redis.from_url(REDIS_URL)
         redis_client.ping()
         services_status["redis"] = {
             "status": "healthy",

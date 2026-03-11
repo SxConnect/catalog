@@ -17,7 +17,9 @@ import pickle
 logger = logging.getLogger(__name__)
 
 # Configuração do Redis para cache
-cache_redis = redis.Redis(host='localhost', port=6381, db=3, decode_responses=False)
+import os
+REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+cache_redis = redis.from_url(REDIS_URL)
 
 # Import das métricas (com fallback se não disponível)
 try:
