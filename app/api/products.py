@@ -313,3 +313,54 @@ def parse_product_ingredients(
     except Exception as e:
         logger.error(f"Error parsing ingredients for product {product_id}: {e}")
         return {"error": f"Erro no parsing: {str(e)}"}
+
+@router.put("/{product_id}")
+@rate_limit_products()
+def update_product(
+    product_id: int,
+    product_data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Atualiza um produto existente.
+    """
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        return {"error": "Product not found"}
+    
+    try:
+        # Campos que podem ser atualizados
+        updatable_fields = [
+            'name', 'brand', 'category', 'description', 'ean',
+            'images', 'attributes', 'ingredients', 'nutritional_info'
+        ]
+        
+        updated = False
+        for field in updatable_fields:
+            if field in product_data:
+                setattr(product, field, product_data[field])
+                updated = True
+        
+        if updated:
+            # Atualizar timestamp
+            product.updated_at = func.now()
+            db.commit()
+            
+            # Invalidar cache
+            invalidate_products_cache()
+            
+            return {
+                "success": True,
+                "product_id": product_id,
+                "message": "Produto atualizado com sucesso"
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Nenhum campo válido para atualizar"
+            }
+            
+    except Exception as e:
+        logger.error(f"Error updating product {product_id}: {e}")
+        db.rollback()
+        return {"error": f"Erro ao atualizar produto: {str(e)}"}
