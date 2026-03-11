@@ -124,5 +124,5 @@ volumes:
   catalog_storage:
 
 networks:
-  portainer_default:
-    external: true
+  default:
+    name: catalog_network

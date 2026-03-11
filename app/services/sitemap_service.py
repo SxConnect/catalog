@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from typing import List, Dict, Optional
 import xml.etree.ElementTree as ET
 from app.logger import logger
+from app.services.normalizer import normalize_product_name, normalize_brand, normalize_ean
 import asyncio
 import re
 
@@ -205,7 +206,15 @@ class SitemapService:
                 logger.warning(f"Could not extract product name from {url}")
                 return None
             
-            logger.info(f"Successfully scraped: {product_data['name']}")
+            # Normalizar dados extraídos
+            product_data['name'] = normalize_product_name(product_data['name'])
+            if product_data['brand']:
+                product_data['brand'] = normalize_brand(product_data['brand'])
+            if product_data['ean']:
+                normalized_ean = normalize_ean(product_data['ean'])
+                product_data['ean'] = normalized_ean  # Pode ser None se inválido
+            
+            logger.info(f"Successfully scraped and normalized: {product_data['name']}")
             return product_data
             
         except Exception as e:

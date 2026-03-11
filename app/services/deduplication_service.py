@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text
 from app.models import Product
+from app.services.normalizer import normalize_ean
 from typing import List, Dict, Optional
 
 class DeduplicationService:
@@ -31,18 +32,20 @@ class DeduplicationService:
             Lista de produtos similares com score
         """
         
-        # Se tem EAN, busca exata primeiro
+        # Se tem EAN, busca exata primeiro (normaliza antes de buscar)
         if ean:
-            exact_match = self.db.query(Product).filter(
-                Product.ean == ean
-            ).first()
-            
-            if exact_match:
-                return [{
-                    "product": exact_match,
-                    "similarity": 1.0,
-                    "match_type": "ean_exact"
-                }]
+            normalized_ean = normalize_ean(ean)
+            if normalized_ean:
+                exact_match = self.db.query(Product).filter(
+                    Product.ean == normalized_ean
+                ).first()
+                
+                if exact_match:
+                    return [{
+                        "product": exact_match,
+                        "similarity": 1.0,
+                        "match_type": "ean_exact"
+                    }]
         
         # Busca por similaridade de nome + marca
         query = text("""
@@ -103,14 +106,16 @@ class DeduplicationService:
             Produto duplicado se encontrado, None caso contrário
         """
         
-        # PRIORIDADE 1: Busca por EAN (índice único)
+        # PRIORIDADE 1: Busca por EAN (índice único, normalizado)
         if ean:
-            exact_match = self.db.query(Product).filter(
-                Product.ean == ean
-            ).first()
-            
-            if exact_match:
-                return exact_match
+            normalized_ean = normalize_ean(ean)
+            if normalized_ean:
+                exact_match = self.db.query(Product).filter(
+                    Product.ean == normalized_ean
+                ).first()
+                
+                if exact_match:
+                    return exact_match
         
         # PRIORIDADE 2: Busca por similaridade
         similar = self.find_similar_products(name, brand, None, strict_threshold)

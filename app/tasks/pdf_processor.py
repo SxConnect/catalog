@@ -4,6 +4,7 @@ from app.services.ai_service import AIService
 from app.services.storage_service import storage_service
 from app.services.deduplication_service import DeduplicationService
 from app.services.web_enrichment import WebEnrichmentService
+from app.services.normalizer import normalize_product_name, normalize_brand, normalize_ean
 from app.database import SessionLocal
 from app.models import Catalog, Product, Settings
 from app.logger import logger, log_catalog_event, log_error
@@ -66,11 +67,19 @@ def process_pdf_task(catalog_id: int, pdf_path: str):
                 
                 if product_data:
                     logger.info(f"AI extracted product: {product_data.get('name')} - {product_data.get('brand')}")
-                    name = product_data.get("name")
-                    brand = product_data.get("brand")
-                    ean = product_data.get("possible_ean")
                     
-                    # Verificar duplicatas (prioriza EAN)
+                    # Normalizar dados antes de processar
+                    raw_name = product_data.get("name")
+                    raw_brand = product_data.get("brand")
+                    raw_ean = product_data.get("possible_ean")
+                    
+                    name = normalize_product_name(raw_name) if raw_name else None
+                    brand = normalize_brand(raw_brand) if raw_brand else None
+                    ean = normalize_ean(raw_ean) if raw_ean else None
+                    
+                    logger.info(f"Normalized product: {name} - {brand} - EAN: {ean}")
+                    
+                    # Verificar duplicatas (prioriza EAN normalizado)
                     duplicate = dedup_service.is_duplicate(name, brand, ean)
                     
                     if duplicate:
@@ -78,7 +87,7 @@ def process_pdf_task(catalog_id: int, pdf_path: str):
                         logger.info(f"Duplicate found: {duplicate.id} - {duplicate.name}")
                         updated = False
                         
-                        # Atualizar EAN se estava vazio
+                        # Atualizar EAN se estava vazio (usando EAN normalizado)
                         if not duplicate.ean and ean:
                             duplicate.ean = ean
                             updated = True
