@@ -3,6 +3,7 @@ name: Build and Push Backend Docker Image
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
     paths:
       - 'catalog/**'
       - '.github/workflows/docker-publish.yml'
@@ -40,6 +41,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
             type=sha,prefix=,format=short
 
       - name: Build and push Docker image
