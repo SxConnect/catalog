@@ -11,9 +11,10 @@ from typing import List, Optional, Dict, Any
 from urllib.parse import urlparse
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from slowapi.middleware import SlowAPIMiddleware
 from pydantic import BaseModel, validator, Field
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -339,6 +340,43 @@ class SecureTextInput(BaseModel):
         return SecurityValidator.sanitize_text(v)
 
 
+def custom_rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
+    """
+    Handler customizado para erros de rate limiting.
+    Lida com diferentes tipos de exceções de forma robusta.
+    """
+    try:
+        # Tentar acessar detail se existir
+        if hasattr(exc, 'detail'):
+            detail = exc.detail
+        elif hasattr(exc, 'message'):
+            detail = exc.message
+        else:
+            detail = str(exc)
+        
+        logger.warning(f"Rate limit exceeded for {request.client.host}: {detail}")
+        
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": "Rate limit exceeded",
+                "detail": detail,
+                "retry_after": "60 seconds"
+            }
+        )
+    except Exception as e:
+        # Fallback para qualquer erro no handler
+        logger.error(f"Error in rate limit handler: {e}")
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": "Rate limit exceeded",
+                "detail": "Too many requests",
+                "retry_after": "60 seconds"
+            }
+        )
+
+
 # Rate limiting decorators para endpoints específicos
 def rate_limit_upload():
     """Rate limit para upload de catálogos: 10 req/min por IP."""
@@ -367,7 +405,14 @@ def setup_rate_limiting(app):
     """
     # Adicionar middleware do SlowAPI
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, custom_rate_limit_handler)
+    # Também capturar erros de autenticação Redis
+    try:
+        import redis
+        app.add_exception_handler(redis.AuthenticationError, custom_rate_limit_handler)
+        app.add_exception_handler(redis.ConnectionError, custom_rate_limit_handler)
+    except ImportError:
+        pass
     app.add_middleware(SlowAPIMiddleware)
     
     logger.info("Rate limiting configured successfully")
