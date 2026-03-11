@@ -5,6 +5,8 @@ Sistema completo de processamento e catalogação de produtos a partir de PDFs u
 [![Build Backend](https://github.com/SxConnect/catalog/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/SxConnect/catalog/actions/workflows/docker-publish.yml)
 [![Build Frontend](https://github.com/SxConnect/catalog/actions/workflows/docker-publish-frontend.yml/badge.svg)](https://github.com/SxConnect/catalog/actions/workflows/docker-publish-frontend.yml)
 
+> **Status**: Imagens Docker sendo atualizadas no GHCR - Build em andamento
+
 ## 📁 Estrutura do Projeto
 
 ```
