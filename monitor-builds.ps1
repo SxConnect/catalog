@@ -37,4 +37,4 @@ Write-Host "   1. Acesse: https://github.com/SxConnect/catalog/actions" -Foregro
 Write-Host "   2. Aguarde os builds completarem (ícones verdes)" -ForegroundColor White
 Write-Host "   3. Execute: ./update-production.sh na VPS" -ForegroundColor White
 Write-Host ""
-Write-Host "🔄 Para verificar novamente, execute: ./monitor-builds.ps1" -ForegroundColor Cyan
+Write-Host "🔄 Para verificar novamente, execute: .\monitor-builds.ps1" -ForegroundColor Cyan
