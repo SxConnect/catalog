@@ -249,8 +249,14 @@ def process_pdf_task(catalog_id: int, pdf_path: str):
         )
         
     except Exception as e:
-        catalog.status = "failed"
-        db.commit()
+        # Verificar se catalog foi definido antes de tentar acessá-lo
+        try:
+            if 'catalog' in locals() and catalog:
+                catalog.status = "failed"
+                db.commit()
+        except Exception as commit_error:
+            logger.error(f"Error updating catalog status to failed: {commit_error}")
+        
         log_error(e, {"catalog_id": catalog_id, "pdf_path": pdf_path})
         log_catalog_event(catalog_id, f"Processing failed: {str(e)}", "error")
         raise e
