@@ -1,52 +1,48 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, HttpUrl
 from typing import Optional, List
 from app.database import get_db
 from app.models import Product, Catalog
 from app.services.sitemap_service import SitemapService
+from app.middleware.security import (
+    rate_limit_sitemap, 
+    SecureSitemapRequest, 
+    SecurityValidator,
+    log_security_event
+)
 from app.logger import logger
 import asyncio
 
 router = APIRouter()
 
-class SitemapImportRequest(BaseModel):
-    sitemap_url: HttpUrl
-    catalog_id: int
-    url_filter: Optional[str] = None  # Regex para filtrar URLs (ex: '/produto/')
-    max_products: Optional[int] = None  # Limite de produtos
-    auto_save: bool = True  # Salvar automaticamente no banco
-
-class SitemapImportResponse(BaseModel):
-    status: str
-    message: str
-    total_urls: int
-    products_extracted: int
-    products_saved: int
-    errors: List[str] = []
-
-@router.post("/import", response_model=SitemapImportResponse)
+@router.post("/import")
+@rate_limit_sitemap()
 async def import_from_sitemap(
-    request: SitemapImportRequest,
+    request: Request,
+    sitemap_request: SecureSitemapRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
-    Importa produtos a partir de um sitemap.xml
+    Importa produtos a partir de um sitemap.xml com validação de segurança.
     
-    Exemplo de uso:
-    ```json
-    {
-        "sitemap_url": "https://www.bbbpet.com.br/sitemap.xml",
-        "catalog_id": 1,
-        "url_filter": "/produto/",
-        "max_products": 50,
-        "auto_save": true
-    }
-    ```
+    Rate limit: 5 requests por minuto por IP.
+    Validações: domínio na whitelist, regex válido, tamanhos limitados.
     """
+    # Log evento de segurança
+    log_security_event(
+        "sitemap_import_attempt",
+        {
+            "sitemap_url": sitemap_request.sitemap_url,
+            "catalog_id": sitemap_request.catalog_id,
+            "max_products": sitemap_request.max_products
+        },
+        request
+    )
+    
     # Verificar se catálogo existe
-    catalog = db.query(Catalog).filter(Catalog.id == request.catalog_id).first()
+    catalog = db.query(Catalog).filter(Catalog.id == sitemap_request.catalog_id).first()
     if not catalog:
         raise HTTPException(status_code=404, detail="Catalog not found")
     
@@ -54,17 +50,17 @@ async def import_from_sitemap(
     
     try:
         # Processar sitemap
-        logger.info(f"Starting sitemap import from {request.sitemap_url}")
+        logger.info(f"Starting sitemap import from {sitemap_request.sitemap_url}")
         products_data = await service.process_sitemap(
-            str(request.sitemap_url),
-            url_filter=request.url_filter,
-            max_products=request.max_products
+            str(sitemap_request.sitemap_url),
+            url_filter=sitemap_request.url_filter,
+            max_products=sitemap_request.max_products
         )
         
         products_saved = 0
         errors = []
         
-        if request.auto_save:
+        if sitemap_request.auto_save:
             # Salvar produtos no banco
             for product_data in products_data:
                 try:
@@ -101,7 +97,7 @@ async def import_from_sitemap(
                     else:
                         # Criar novo produto
                         new_product = Product(
-                            catalog_id=request.catalog_id,
+                            catalog_id=sitemap_request.catalog_id,
                             name=product_data['name'],
                             brand=product_data.get('brand', 'Unknown'),
                             ean=product_data.get('ean'),
@@ -130,14 +126,25 @@ async def import_from_sitemap(
         
         await service.close()
         
-        return SitemapImportResponse(
-            status="success",
-            message=f"Successfully imported {products_saved} products from sitemap",
-            total_urls=len(products_data),
-            products_extracted=len(products_data),
-            products_saved=products_saved,
-            errors=errors
+        # Log evento de sucesso
+        log_security_event(
+            "sitemap_import_success",
+            {
+                "sitemap_url": sitemap_request.sitemap_url,
+                "products_saved": products_saved,
+                "total_urls": len(products_data)
+            },
+            request
         )
+        
+        return {
+            "status": "success",
+            "message": f"Successfully imported {products_saved} products from sitemap",
+            "total_urls": len(products_data),
+            "products_extracted": len(products_data),
+            "products_saved": products_saved,
+            "errors": errors
+        }
         
     except Exception as e:
         await service.close()
@@ -145,6 +152,7 @@ async def import_from_sitemap(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/preview")
+@rate_limit_sitemap()
 async def preview_sitemap(
     sitemap_url: HttpUrl,
     url_filter: Optional[str] = None,
@@ -181,6 +189,7 @@ async def preview_sitemap(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/test-scrape")
+@rate_limit_sitemap()
 async def test_scrape_url(url: HttpUrl):
     """
     Testa a extração de dados de uma URL específica

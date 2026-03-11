@@ -3,11 +3,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, desc, asc
 from app.database import get_db
 from app.models import Product
+from app.middleware.security import rate_limit_products
 from typing import List, Optional
 
 router = APIRouter()
 
 @router.get("/search")
+@rate_limit_products()
 def search_products(
     q: Optional[str] = Query(None, min_length=2),
     brand: Optional[str] = None,
@@ -15,8 +17,8 @@ def search_products(
     category: Optional[str] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, le=100),
-    sort_by: str = Query("name", regex="^(name|brand|created_at)$"),
-    sort_order: str = Query("asc", regex="^(asc|desc)$"),
+    sort_by: str = Query("name", pattern="^(name|brand|created_at)$"),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db)
 ):
     """
@@ -64,6 +66,7 @@ def search_products(
     }
 
 @router.get("/", response_model=List[dict])
+@rate_limit_products()
 def list_products(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, le=100),
@@ -73,6 +76,7 @@ def list_products(
     return products
 
 @router.get("/{product_id}")
+@rate_limit_products()
 def get_product(product_id: int, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
@@ -80,6 +84,7 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
     return product
 
 @router.get("/export/csv")
+@rate_limit_products()
 def export_csv(db: Session = Depends(get_db)):
     import csv
     import io
@@ -114,6 +119,7 @@ def export_csv(db: Session = Depends(get_db)):
     )
 
 @router.get("/export/json")
+@rate_limit_products()
 def export_json(db: Session = Depends(get_db)):
     products = db.query(Product).all()
     return {"products": [p.__dict__ for p in products]}

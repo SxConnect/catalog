@@ -1,10 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import catalog, products, admin, search, deduplication, sitemap, status
+from app.middleware.security import setup_security
 
 app = FastAPI(title="SixPet Catalog Engine", version="1.0.7")
 
-# Aumentar limite de upload para 100MB
+# Configurar segurança (rate limiting, headers, validação)
+setup_security(app)
+
+# Aumentar limite de upload para 50MB (conforme especificação de segurança)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

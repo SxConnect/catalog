@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.deduplication_service import DeduplicationService
+from app.middleware.security import rate_limit_products, rate_limit_admin
 from typing import Optional
 
 router = APIRouter()
 
 @router.get("/check")
+@rate_limit_products()
 def check_duplicate(
     name: str = Query(..., min_length=2),
     brand: str = Query(..., min_length=2),
@@ -34,6 +36,7 @@ def check_duplicate(
     return {"is_duplicate": False}
 
 @router.get("/similar")
+@rate_limit_products()
 def find_similar(
     name: str = Query(..., min_length=2),
     brand: str = Query(..., min_length=2),
@@ -65,6 +68,7 @@ def find_similar(
     }
 
 @router.get("/find-all")
+@rate_limit_products()
 def find_all_duplicates(
     threshold: float = Query(0.85, ge=0.0, le=1.0),
     limit: int = Query(100, le=1000),
@@ -97,6 +101,7 @@ def find_all_duplicates(
     }
 
 @router.post("/merge")
+@rate_limit_admin()
 def merge_duplicates(
     keep_id: int,
     remove_id: int,

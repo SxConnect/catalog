@@ -3,10 +3,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
 from app.models import Catalog, Product, ApiKey
+from app.middleware.security import rate_limit_admin
 
 router = APIRouter()
 
 @router.get("/stats")
+@rate_limit_admin()
 def get_stats(db: Session = Depends(get_db)):
     total_catalogs = db.query(func.count(Catalog.id)).scalar()
     total_products = db.query(func.count(Product.id)).scalar()
@@ -21,6 +23,7 @@ def get_stats(db: Session = Depends(get_db)):
     }
 
 @router.get("/api-keys")
+@rate_limit_admin()
 def list_api_keys(db: Session = Depends(get_db)):
     keys = db.query(ApiKey).all()
     return keys
@@ -33,6 +36,7 @@ class ApiKeyCreate(BaseModel):
     daily_limit: int = 14400
 
 @router.post("/api-keys")
+@rate_limit_admin()
 def create_api_key(
     data: ApiKeyCreate,
     db: Session = Depends(get_db)
@@ -58,6 +62,7 @@ def create_api_key(
     return api_key
 
 @router.delete("/api-keys/{key_id}")
+@rate_limit_admin()
 def delete_api_key(key_id: int, db: Session = Depends(get_db)):
     """Remove uma API key"""
     api_key = db.query(ApiKey).filter(ApiKey.id == key_id).first()
@@ -70,6 +75,7 @@ def delete_api_key(key_id: int, db: Session = Depends(get_db)):
     return {"message": "API key deleted successfully"}
 
 @router.get("/queue/status")
+@rate_limit_admin()
 def queue_status():
     return {"message": "Queue status endpoint"}
 
@@ -87,6 +93,7 @@ class SettingsUpdate(BaseModel):
     similarity_threshold: float = 0.85
 
 @router.get("/settings")
+@rate_limit_admin()
 def get_settings(db: Session = Depends(get_db)):
     """Retorna todas as configurações do sistema"""
     settings_dict = {}
@@ -111,6 +118,7 @@ def get_settings(db: Session = Depends(get_db)):
     return {**defaults, **settings_dict}
 
 @router.put("/settings")
+@rate_limit_admin()
 def update_settings(data: SettingsUpdate, db: Session = Depends(get_db)):
     """Atualiza as configurações do sistema"""
     settings_data = {

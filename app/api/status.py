@@ -2,12 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Catalog, Product
+from app.middleware.security import rate_limit_products
 from typing import List, Dict
 from datetime import datetime
 
 router = APIRouter()
 
 @router.get("/catalog/{catalog_id}/status")
+@rate_limit_products()
 def get_catalog_status(catalog_id: int, db: Session = Depends(get_db)):
     """
     Retorna status detalhado do processamento do catálogo
@@ -55,6 +57,7 @@ def get_catalog_status(catalog_id: int, db: Session = Depends(get_db)):
     }
 
 @router.get("/catalog/{catalog_id}/products")
+@rate_limit_products()
 def get_catalog_products(
     catalog_id: int,
     skip: int = 0,
@@ -83,6 +86,7 @@ def get_catalog_products(
     }
 
 @router.get("/recent")
+@rate_limit_products()
 def get_recent_catalogs(limit: int = 10, db: Session = Depends(get_db)):
     """
     Lista catálogos recentes com status
@@ -114,6 +118,7 @@ def get_recent_catalogs(limit: int = 10, db: Session = Depends(get_db)):
     return {"catalogs": result}
 
 @router.get("/stats")
+@rate_limit_products()
 def get_processing_stats(db: Session = Depends(get_db)):
     """
     Estatísticas gerais de processamento

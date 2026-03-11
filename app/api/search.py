@@ -3,11 +3,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from app.database import get_db
 from app.models import Product
+from app.middleware.security import rate_limit_products
 from typing import List, Optional
 
 router = APIRouter()
 
 @router.get("/")
+@rate_limit_products()
 def search_products(
     q: str = Query(..., min_length=2),
     limit: int = Query(50, le=100),
@@ -37,6 +39,7 @@ def search_products(
     }
 
 @router.get("/by-ean/{ean}")
+@rate_limit_products()
 def search_by_ean(ean: str, db: Session = Depends(get_db)):
     """Busca exata por EAN usando index"""
     product = db.query(Product).filter(Product.ean == ean).first()
@@ -45,6 +48,7 @@ def search_by_ean(ean: str, db: Session = Depends(get_db)):
     return product
 
 @router.get("/by-brand/{brand}")
+@rate_limit_products()
 def search_by_brand(
     brand: str,
     skip: int = Query(0, ge=0),
