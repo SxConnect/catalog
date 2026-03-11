@@ -2,6 +2,9 @@
 
 Sistema completo de processamento e catalogação de produtos a partir de PDFs usando IA, com interface web moderna.
 
+[![Build Backend](https://github.com/SxConnect/catalog/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/SxConnect/catalog/actions/workflows/docker-publish.yml)
+[![Build Frontend](https://github.com/SxConnect/catalog/actions/workflows/docker-publish-frontend.yml/badge.svg)](https://github.com/SxConnect/catalog/actions/workflows/docker-publish-frontend.yml)
+
 ## 📁 Estrutura do Projeto
 
 ```
