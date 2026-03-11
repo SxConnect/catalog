@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: catalog-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sixpet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sixpet123}
+      POSTGRES_DB: ${POSTGRES_DB:-sixpet_catalog}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sixpet -d sixpet_catalog"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: catalog-redis
+    restart: always
+    command: redis-server --requirepass "" --protected-mode no
+    ports:
+      - "6381:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: ghcr.io/sxconnect/catalog:1.0.7
+    container_name: catalog-api
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-sixpet}:${POSTGRES_PASSWORD:-sixpet123}@postgres:5432/${POSTGRES_DB:-sixpet_catalog}
+      - REDIS_URL=redis://redis:6379/0
+      - GROQ_API_KEYS=${GROQ_API_KEYS:-gsk_test_key}
+      - STORAGE_TYPE=filesystem
+      - STORAGE_PATH=/app/storage
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    volumes:
+      - catalog_storage:/app/storage
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  worker:
+    image: ghcr.io/sxconnect/catalog:1.0.7
+    container_name: catalog-worker
+    restart: always
+    command: celery -A app.tasks.worker worker --loglevel=info --concurrency=4
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-sixpet}:${POSTGRES_PASSWORD:-sixpet123}@postgres:5432/${POSTGRES_DB:-sixpet_catalog}
+      - REDIS_URL=redis://redis:6379/0
+      - GROQ_API_KEYS=${GROQ_API_KEYS:-gsk_test_key}
+      - STORAGE_TYPE=filesystem
+      - STORAGE_PATH=/app/storage
+    volumes:
+      - catalog_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    image: ghcr.io/sxconnect/catalog-frontend:1.0.2
+    container_name: catalog-frontend
+    restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-your-secret-key-here}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@catalog.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+  catalog_storage:

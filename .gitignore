@@ -1,11 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Environment
+.env
+.env.local
+
+# Storage
+storage/
+
+# Database
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
+
+# Tests
+test_*.py
+*_test.py
+tests/output/
+
+# Temporary
+*.tmp
+*.bak
+create_tables.sql
+
+# Frontend
+catalog-frontend/node_modules/
+catalog-frontend/.next/
+catalog-frontend/out/
+catalog-frontend/build/
+catalog-frontend/.env.local
+catalog-frontend/.env.production.local
+catalog-frontend/.env.development.local
+catalog-frontend/.env.test.local
+catalog-frontend/yarn.lock
+catalog-frontend/pnpm-lock.yaml
+
+catalog/frontend/node_modules/
+catalog/frontend/.next/
+catalog/frontend/out/
+catalog/frontend/build/
+catalog/frontend/.env.local
+catalog/frontend/.env.production.local
+catalog/frontend/.env.development.local
+catalog/frontend/.env.test.local
+catalog/frontend/yarn.lock
+catalog/frontend/pnpm-lock.yaml
+
 # Pastas locais que não devem ir para o GitHub
 planejamento/
 catalogos pet/
-
-# Arquivos temporários
-*.tmp
-*.bak
-*.log
 
 # Arquivos de sistema
 .DS_Store

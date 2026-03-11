@@ -1,0 +1,38 @@
+name: Deploy to Production
+
+on:
+  workflow_run:
+    workflows: ["Docker Build and Push"]
+    types:
+      - completed
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy notification
+        run: |
+          echo "🚀 Deploying SixPet Catalog Engine"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main"
+          echo "Commit: ${{ github.sha }}"
+          
+      # Adicione aqui seus steps de deploy específicos
+      # Exemplos:
+      # - Deploy para Kubernetes
+      # - Deploy para Docker Swarm
+      # - Deploy para servidor via SSH
+      # - Atualizar docker-compose.yml remoto
+      
+      - name: Deployment complete
+        run: |
+          echo "✅ Deployment completed successfully"
