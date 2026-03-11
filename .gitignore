@@ -1,0 +1,12 @@
+# Pastas locais que não devem ir para o GitHub
+planejamento/
+catalogos pet/
+
+# Arquivos temporários
+*.tmp
+*.bak
+*.log
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db

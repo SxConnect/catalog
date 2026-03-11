@@ -1,0 +1,17 @@
+# Database
+POSTGRES_USER=sixpet
+POSTGRES_PASSWORD=CHANGE_ME_STRONG_PASSWORD
+POSTGRES_DB=sixpet_catalog
+
+# MinIO Existente (usar o que já está instalado)
+MINIO_S3_DOMAIN=minio-s3.sxconnect.com.br
+MINIO_ROOT_USER=admin
+MINIO_ROOT_PASSWORD=CHANGE_ME_MINIO_PASSWORD
+S3_BUCKET=sixpet-catalog
+
+# Groq API Keys (comma separated for rotation)
+GROQ_API_KEYS=gsk_key1,gsk_key2,gsk_key3
+
+# Application
+API_HOST=0.0.0.0
+API_PORT=8000
