@@ -1,12 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    output: 'standalone',
-    images: {
-        domains: ['mins3.sxconnect.com.br', 'localhost'],
+    async rewrites() {
+        return [
+            {
+                source: '/api-proxy/:path*',
+                destination: 'http://sixpet-catalog-api:8000/api/:path*',
+            },
+        ];
     },
-    env: {
-        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
-    },
-}
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;
