@@ -7,8 +7,8 @@ const getApiUrl = () => {
         return 'http://sixpet-catalog-api:8000';
     }
 
-    // No cliente, usar porta 8000 diretamente
-    return 'http://vmi2917323.contaboserver.net:8000';
+    // No cliente, usar o novo subdomínio
+    return 'https://sixpetapi.sxconnect.com.br';
 };
 
 const api = axios.create({
