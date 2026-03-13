@@ -1,3 +1,15 @@
+#!/bin/bash
+
+# Script para atualizar o sitemap_simple.py na VPS
+
+echo "Navegando para o diretório do projeto..."
+cd /root/catalog
+
+echo "Fazendo backup do arquivo atual..."
+cp app/api/sitemap_simple.py app/api/sitemap_simple.py.backup
+
+echo "Criando novo arquivo sitemap_simple.py..."
+cat > app/api/sitemap_simple.py << 'EOF'
 from fastapi import APIRouter, HTTPException, Depends
 from app.logger import logger
 from app.database import get_db
@@ -420,3 +432,23 @@ async def list_extracted_products(limit: int = 10, db: Session = Depends(get_db)
 async def sitemap_health():
     """Health check para o módulo sitemap"""
     return {"status": "ok", "module": "sitemap"}
+EOF
+
+echo "Verificando se o arquivo foi criado corretamente..."
+ls -la app/api/sitemap_simple.py
+
+echo "Reiniciando containers..."
+docker-compose restart api
+
+echo "Aguardando containers iniciarem..."
+sleep 10
+
+echo "Testando endpoint de health..."
+curl -s http://localhost:8000/api/sitemap/health
+
+echo ""
+echo "Testando extração inteligente..."
+curl -s "http://localhost:8000/api/sitemap/smart-extract?url=https://www.bbbpet.com.br/produto/kit-higienico-1-und"
+
+echo ""
+echo "Atualização concluída!"
