@@ -7,7 +7,6 @@ import httpx
 from bs4 import BeautifulSoup
 import re
 from urllib.parse import urljoin
-from typing import Optional
 
 router = APIRouter()
 
@@ -16,11 +15,11 @@ async def sitemap_health():
     """Health check para o módulo sitemap"""
     return {"status": "ok", "module": "sitemap"}
 
-@router.get("/test-scrape")
+@router.post("/test-scrape")
 async def test_scrape_url(url: str):
     """
     Testa a extração de dados de uma URL específica
-    Uso: GET /api/sitemap/test-scrape?url=https://example.com
+    Uso: POST /api/sitemap/test-scrape?url=https://example.com
     """
     try:
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
@@ -143,15 +142,15 @@ async def smart_extract_products(url: str, max_products: int = 20, db: Session =
             base_domain = '/'.join(url.split('/')[:3])
             
             # Detectar se é página de produto
-            is_product_page = is_product_page_check(soup, url)
+            is_product = detect_product_page(soup, url)
             
             processed_products = []
             
-            if is_product_page:
+            if is_product:
                 logger.info(f"Detected product page: {url}")
-                product_data = extract_product_data(soup, url)
+                product_data = extract_product_data_complete(soup, url)
                 if product_data and product_data.get('name'):
-                    product_id = save_product_to_db(db, product_data)
+                    product_id = save_product_db(db, product_data)
                     if product_id:
                         processed_products.append({
                             'id': product_id,
@@ -162,14 +161,14 @@ async def smart_extract_products(url: str, max_products: int = 20, db: Session =
                         })
             else:
                 logger.info(f"Detected category/listing page: {url}")
-                product_links = extract_product_links(soup, base_domain, url)
+                product_links = extract_links(soup, base_domain, url)
                 logger.info(f"Found {len(product_links)} product links on page")
                 
                 for product_url in product_links[:max_products]:
                     try:
-                        product_data = await extract_product_from_url(product_url, client, headers)
+                        product_data = await extract_from_url(product_url, client, headers)
                         if product_data and product_data.get('name'):
-                            product_id = save_product_to_db(db, product_data)
+                            product_id = save_product_db(db, product_data)
                             if product_id:
                                 processed_products.append({
                                     'id': product_id,
@@ -188,7 +187,7 @@ async def smart_extract_products(url: str, max_products: int = 20, db: Session =
                 "status": "success",
                 "message": f"Smart extraction completed: {len(processed_products)} products processed",
                 "source_url": url,
-                "page_type": "product" if is_product_page else "category/listing",
+                "page_type": "product" if is_product else "category/listing",
                 "products_processed": len(processed_products),
                 "products": processed_products
             }
@@ -231,11 +230,11 @@ async def list_extracted_products(limit: int = 10, db: Session = Depends(get_db)
         logger.error(f"Error listing products: {e}")
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
-# Funções auxiliares
-def is_product_page_check(soup, url):
+# Funções auxiliares com nomes únicos
+def detect_product_page(soup, url):
     """Detecta se é uma página de produto"""
     try:
-        product_indicators = [
+        indicators = [
             '/produto/' in url.lower(),
             '/product/' in url.lower(),
             '/p/' in url.lower(),
@@ -246,15 +245,15 @@ def is_product_page_check(soup, url):
             soup.select_one('.add-to-cart') is not None,
             soup.select_one('.comprar') is not None,
         ]
-        return sum(product_indicators) >= 2
+        return sum(indicators) >= 2
     except:
         return False
 
-def extract_product_links(soup, base_domain, current_url):
+def extract_links(soup, base_domain, current_url):
     """Extrai links de produtos da página atual"""
     try:
-        product_links = []
-        product_selectors = [
+        links = []
+        selectors = [
             'a[href*="/produto/"]',
             'a[href*="/product/"]',
             'a[href*="/p/"]',
@@ -265,38 +264,38 @@ def extract_product_links(soup, base_domain, current_url):
             '.product-card a'
         ]
         
-        for selector in product_selectors:
-            links = soup.select(selector)
-            for link in links:
-                href = link.get('href')
+        for selector in selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                href = element.get('href')
                 if href:
                     if href.startswith('/'):
                         href = base_domain + href
                     elif not href.startswith('http'):
                         href = urljoin(current_url, href)
                     
-                    if href not in product_links:
-                        product_links.append(href)
+                    if href not in links:
+                        links.append(href)
         
-        return product_links
+        return links
     except:
         return []
 
-async def extract_product_from_url(product_url, client, headers):
+async def extract_from_url(product_url, client, headers):
     """Extrai dados de produto de uma URL específica"""
     try:
         response = await client.get(product_url, headers=headers)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-        return extract_product_data(soup, product_url)
+        return extract_product_data_complete(soup, product_url)
     except Exception as e:
         logger.error(f"Error extracting product from {product_url}: {e}")
         return None
 
-def extract_product_data(soup, url):
+def extract_product_data_complete(soup, url):
     """Extrai dados completos do produto"""
     try:
-        product_data = {
+        data = {
             'source_url': url,
             'name': None,
             'brand': None,
@@ -307,32 +306,32 @@ def extract_product_data(soup, url):
             'ean': None
         }
         
-        # Extrair nome do produto
+        # Nome do produto
         name_selectors = ['h1', '.product-name', '.product-title', '[itemprop="name"]']
         for selector in name_selectors:
             elem = soup.select_one(selector)
             if elem:
                 name = elem.get_text(strip=True)
                 if len(name) > 5:
-                    product_data['name'] = name
+                    data['name'] = name
                     break
         
-        # Extrair marca
+        # Marca
         brand_selectors = ['[itemprop="brand"]', '.product-brand', '.brand-name']
         for selector in brand_selectors:
             elem = soup.select_one(selector)
             if elem:
                 if elem.name == 'meta':
-                    product_data['brand'] = elem.get('content', '').strip()
+                    data['brand'] = elem.get('content', '').strip()
                 else:
-                    product_data['brand'] = elem.get_text(strip=True)
+                    data['brand'] = elem.get_text(strip=True)
                 break
         
-        if not product_data['brand']:
+        if not data['brand']:
             domain = url.split('/')[2].replace('www.', '').split('.')[0]
-            product_data['brand'] = domain.upper()
+            data['brand'] = domain.upper()
         
-        # Extrair preço
+        # Preço
         price_selectors = ['[itemprop="price"]', '.product-price', '.price', '.valor', '.preco']
         for selector in price_selectors:
             elem = soup.select_one(selector)
@@ -341,25 +340,25 @@ def extract_product_data(soup, url):
                 price_match = re.search(r'(\d+[.,]\d{2})', price_text)
                 if price_match:
                     try:
-                        product_data['price'] = float(price_match.group(1).replace(',', '.'))
+                        data['price'] = float(price_match.group(1).replace(',', '.'))
                         break
                     except:
                         continue
         
-        # Extrair descrição
+        # Descrição
         desc_selectors = ['[itemprop="description"]', '.product-description', '.description']
         for selector in desc_selectors:
             elem = soup.select_one(selector)
             if elem:
                 if elem.name == 'meta':
-                    product_data['description'] = elem.get('content', '').strip()
+                    data['description'] = elem.get('content', '').strip()
                 else:
                     desc = elem.get_text(strip=True)
                     if len(desc) > 10:
-                        product_data['description'] = desc[:500]
+                        data['description'] = desc[:500]
                 break
         
-        # Extrair imagens
+        # Imagens
         img_selectors = ['img[itemprop="image"]', '.product-image img', '.product-gallery img']
         for selector in img_selectors:
             imgs = soup.select(selector)
@@ -368,17 +367,17 @@ def extract_product_data(soup, url):
                 if src and 'placeholder' not in src.lower():
                     if not src.startswith('http'):
                         src = urljoin(url, src)
-                    if src not in product_data['images']:
-                        product_data['images'].append(src)
-            if product_data['images']:
+                    if src not in data['images']:
+                        data['images'].append(src)
+            if data['images']:
                 break
         
-        return product_data
+        return data
     except Exception as e:
         logger.error(f"Error extracting product data: {e}")
         return None
 
-def save_product_to_db(db, product_data):
+def save_product_db(db, product_data):
     """Salva produto no banco de dados"""
     try:
         result = db.execute(text("""
