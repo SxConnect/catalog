@@ -142,7 +142,7 @@ async def smart_extract_products(url: str, max_products: int = 20, db: Session =
             base_domain = '/'.join(url.split('/')[:3])
             
             # Detectar se é página de produto
-            is_product = detect_product_page(soup, url)
+            is_product = detect_product_page_simple(soup, url)
             
             processed_products = []
             
@@ -161,12 +161,12 @@ async def smart_extract_products(url: str, max_products: int = 20, db: Session =
                         })
             else:
                 logger.info(f"Detected category/listing page: {url}")
-                product_links = extract_links(soup, base_domain, url)
+                product_links = extract_links_simple(soup, base_domain, url)
                 logger.info(f"Found {len(product_links)} product links on page")
                 
                 for product_url in product_links[:max_products]:
                     try:
-                        product_data = await extract_from_url(product_url, client, headers)
+                        product_data = await extract_from_url_simple(product_url, client, headers)
                         if product_data and product_data.get('name'):
                             product_id = save_product_db(db, product_data)
                             if product_id:
@@ -231,7 +231,7 @@ async def list_extracted_products(limit: int = 10, db: Session = Depends(get_db)
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 # Funções auxiliares com nomes únicos
-def detect_product_page(soup, url):
+def detect_product_page_simple(soup, url):
     """Detecta se é uma página de produto"""
     try:
         indicators = [
@@ -249,7 +249,7 @@ def detect_product_page(soup, url):
     except:
         return False
 
-def extract_links(soup, base_domain, current_url):
+def extract_links_simple(soup, base_domain, current_url):
     """Extrai links de produtos da página atual"""
     try:
         links = []
@@ -281,7 +281,7 @@ def extract_links(soup, base_domain, current_url):
     except:
         return []
 
-async def extract_from_url(product_url, client, headers):
+async def extract_from_url_simple(product_url, client, headers):
     """Extrai dados de produto de uma URL específica"""
     try:
         response = await client.get(product_url, headers=headers)
