@@ -12,9 +12,10 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
+      - catalog_network
       - portainer_default
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sixpet -d sixpet_catalog"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sixpet} -d ${POSTGRES_DB:-sixpet_catalog}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,6 +26,7 @@ services:
     restart: always
     command: redis-server --requirepass "" --protected-mode no
     networks:
+      - catalog_network
       - portainer_default
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -33,7 +35,7 @@ services:
       retries: 5
 
   api:
-    image: ghcr.io/sxconnect/catalog:1.0.7
+    image: ghcr.io/sxconnect/catalog-backend:latest
     container_name: sixpet-catalog-api
     restart: always
     environment:
@@ -47,6 +49,9 @@ services:
       - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
       - S3_PUBLIC_URL=https://${MINIO_S3_DOMAIN:-mins3.sxconnect.com.br}
       - S3_REGION=us-east-1
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - URL_EXTRACTOR_SERVICE=http://url-extractor:8001
     volumes:
       - catalog_storage:/app/storage
     depends_on:
@@ -55,13 +60,17 @@ services:
       redis:
         condition: service_healthy
     networks:
+      - catalog_network
       - portainer_default
+    expose:
+      - "8000"
     labels:
       - traefik.enable=true
       - traefik.http.routers.catalog-api.rule=Host(`catalog-api.sxconnect.com.br`)
       - traefik.http.routers.catalog-api.entrypoints=websecure
       - traefik.http.routers.catalog-api.tls.certresolver=leresolver
       - traefik.http.services.catalog-api.loadbalancer.server.port=8000
+      - traefik.docker.network=portainer_default
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -69,7 +78,7 @@ services:
       retries: 3
 
   worker:
-    image: ghcr.io/sxconnect/catalog:1.0.7
+    image: ghcr.io/sxconnect/catalog-backend:latest
     container_name: sixpet-catalog-worker
     restart: always
     command: celery -A app.tasks.worker worker --loglevel=info --concurrency=4
@@ -92,9 +101,31 @@ services:
       redis:
         condition: service_healthy
     networks:
+      - catalog_network
       - portainer_default
+
+  url-extractor:
+    image: ghcr.io/sxconnect/catalog-url-extractor:latest
+    container_name: sixpet-catalog-url-extractor
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-sixpet}:${POSTGRES_PASSWORD:-sixpet123}@postgres:5432/${POSTGRES_DB:-sixpet_catalog}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - catalog_network
+      - portainer_default
+    expose:
+      - "8001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   frontend:
-    image: ghcr.io/sxconnect/catalog-frontend:1.0.2
+    image: ghcr.io/sxconnect/catalog-frontend:latest
     container_name: sixpet-catalog-frontend
     restart: always
     environment:
@@ -106,13 +137,17 @@ services:
     depends_on:
       - api
     networks:
+      - catalog_network
       - portainer_default
+    expose:
+      - "3000"
     labels:
       - traefik.enable=true
       - traefik.http.routers.catalog-frontend.rule=Host(`catalog.sxconnect.com.br`)
       - traefik.http.routers.catalog-frontend.entrypoints=websecure
       - traefik.http.routers.catalog-frontend.tls.certresolver=leresolver
       - traefik.http.services.catalog-frontend.loadbalancer.server.port=3000
+      - traefik.docker.network=portainer_default
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
@@ -124,5 +159,7 @@ volumes:
   catalog_storage:
 
 networks:
-  default:
-    name: catalog_network
+  catalog_network:
+    driver: bridge
+  portainer_default:
+    external: true
