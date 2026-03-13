@@ -4,7 +4,7 @@ from fastapi.responses import PlainTextResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi import Depends, HTTPException
 from app.api import catalog, products, admin, search, deduplication, status, health
-from app.api import url_extractor_fixed as sitemap
+from app.api import url_extractor_proxy as sitemap
 from app.monitoring.metrics import get_prometheus_metrics, get_metrics_content_type
 import secrets
 import logging

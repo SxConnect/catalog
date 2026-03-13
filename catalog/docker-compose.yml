@@ -56,6 +56,17 @@ services:
       - redis
       - minio
 
+  url-extractor:
+    build: 
+      context: ./url_extractor_service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://sixpet:sixpet123@postgres:5432/sixpet_catalog
+    depends_on:
+      - postgres
+
 volumes:
   postgres_data:
   minio_data:
