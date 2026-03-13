@@ -10,6 +10,23 @@ from urllib.parse import urljoin
 
 router = APIRouter()
 
+@router.get("/debug")
+async def debug_routes():
+    """Debug: lista todas as rotas disponíveis"""
+    routes = []
+    for route in router.routes:
+        if hasattr(route, 'path') and hasattr(route, 'methods'):
+            routes.append({
+                'path': route.path,
+                'methods': list(route.methods),
+                'name': getattr(route, 'name', 'unnamed')
+            })
+    return {
+        "status": "debug",
+        "total_routes": len(router.routes),
+        "routes": routes
+    }
+
 @router.get("/health")
 async def sitemap_health():
     """Health check para o módulo sitemap"""
