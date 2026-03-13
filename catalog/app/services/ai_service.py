@@ -50,7 +50,7 @@ class AIService:
         try:
             logger.debug(f"Making Groq API call for text length: {len(raw_text)}")
             response = client.chat.completions.create(
-                model="llama-3.1-70b-versatile",
+                model="llama-3.3-70b-versatile",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1
             )
