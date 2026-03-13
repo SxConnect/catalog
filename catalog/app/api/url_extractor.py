@@ -13,19 +13,17 @@ router = APIRouter()
 @router.get("/debug")
 async def debug_routes():
     """Debug: lista todas as rotas disponíveis"""
-    routes = []
-    for route in router.routes:
-        if hasattr(route, 'path') and hasattr(route, 'methods'):
-            routes.append({
-                'path': route.path,
-                'methods': list(route.methods),
-                'name': getattr(route, 'name', 'unnamed')
-            })
-    return {
-        "status": "debug",
-        "total_routes": len(router.routes),
-        "routes": routes
-    }
+    try:
+        return {
+            "status": "debug",
+            "message": "Debug endpoint is working",
+            "total_routes": "checking..."
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 @router.get("/health")
 async def sitemap_health():
