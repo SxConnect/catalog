@@ -3,13 +3,13 @@ from app.logger import logger
 
 router = APIRouter()
 
-@router.get("/debug")
-async def debug_routes():
-    """Debug: endpoint de teste"""
-    return {"status": "debug", "message": "Debug endpoint is working"}
+@router.get("/status")
+async def sitemap_status():
+    """Status check para o módulo sitemap"""
+    return {"status": "ok", "module": "sitemap", "endpoints": ["status", "extract", "list", "scrape"]}
 
-@router.get("/smart-extract")
-async def smart_extract_products(url: str, max_products: int = 20):
+@router.get("/extract")
+async def extract_products_from_url(url: str, max_products: int = 20):
     """Extração inteligente: detecta automaticamente se é produto ou categoria"""
     return {
         "status": "success",
@@ -18,8 +18,8 @@ async def smart_extract_products(url: str, max_products: int = 20):
         "max_products": max_products
     }
 
-@router.get("/products")
-async def list_extracted_products(limit: int = 10):
+@router.get("/list")
+async def list_products_from_urls(limit: int = 10):
     """Lista os produtos extraídos de URLs"""
     return {
         "status": "success",
@@ -28,16 +28,11 @@ async def list_extracted_products(limit: int = 10):
         "products": []
     }
 
-@router.post("/test-scrape")
-async def test_scrape_url(url: str):
+@router.post("/scrape")
+async def scrape_single_url(url: str):
     """Testa a extração de dados de uma URL específica"""
     return {
         "status": "success",
         "message": "Test scrape endpoint is working",
         "url": url
     }
-
-@router.get("/health")
-async def sitemap_health():
-    """Health check para o módulo sitemap"""
-    return {"status": "ok", "module": "sitemap"}
