@@ -10,6 +10,7 @@ import logging
 from typing import Dict, Any, Optional, List
 from functools import wraps
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 from prometheus_client import (
     Counter, 
     Histogram, 
@@ -334,7 +335,7 @@ def monitor_scraping(func):
     @wraps(func)
     async def async_wrapper(*args, **kwargs):
         url = args[0] if args else kwargs.get('url', 'unknown')
-        domain = __import__('urllib.parse').urlparse(url).netloc
+        domain = urlparse(url).netloc
         
         start_time = time.time()
         try:
@@ -357,7 +358,7 @@ def monitor_scraping(func):
     @wraps(func)
     def sync_wrapper(*args, **kwargs):
         url = args[0] if args else kwargs.get('url', 'unknown')
-        domain = __import__('urllib.parse').urlparse(url).netloc
+        domain = urlparse(url).netloc
         
         start_time = time.time()
         try:

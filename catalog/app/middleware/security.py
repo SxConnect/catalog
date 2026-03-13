@@ -31,8 +31,7 @@ def create_redis_client():
     """Cria cliente Redis com fallback para diferentes configurações."""
     try:
         # Primeiro, tentar conectar sem autenticação (configuração padrão)
-        import urllib.parse
-        parsed = urllib.parse.urlparse(REDIS_URL)
+        parsed = urlparse(REDIS_URL)
         
         # Configuração básica sem autenticação
         client = redis.Redis(
