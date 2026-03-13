@@ -3,11 +3,6 @@ from app.logger import logger
 
 router = APIRouter()
 
-@router.get("/health")
-async def sitemap_health():
-    """Health check para o módulo sitemap"""
-    return {"status": "ok", "module": "sitemap"}
-
 @router.get("/debug")
 async def debug_routes():
     """Debug: endpoint de teste"""
@@ -41,3 +36,8 @@ async def test_scrape_url(url: str):
         "message": "Test scrape endpoint is working",
         "url": url
     }
+
+@router.get("/health")
+async def sitemap_health():
+    """Health check para o módulo sitemap"""
+    return {"status": "ok", "module": "sitemap"}
