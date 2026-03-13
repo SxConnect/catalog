@@ -190,8 +190,7 @@ async def preview_sitemap(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/test-scrape")
-@rate_limit_sitemap()
-async def test_scrape_url(request: Request, url: HttpUrl):
+async def test_scrape_url(url: str):
     """
     Testa a extração de dados de uma URL específica
     Útil para verificar se o scraping está funcionando
@@ -199,7 +198,7 @@ async def test_scrape_url(request: Request, url: HttpUrl):
     service = SitemapService()
     
     try:
-        product_data = await service.scrape_product_page(str(url))
+        product_data = await service.scrape_product_page(url)
         await service.close()
         
         if not product_data:
