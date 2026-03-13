@@ -2,6 +2,7 @@ import httpx
 from bs4 import BeautifulSoup
 from typing import List, Dict, Optional
 import xml.etree.ElementTree as ET
+from urllib.parse import urljoin
 from app.logger import logger
 from app.services.normalizer import normalize_product_name, normalize_brand, normalize_ean
 from app.utils.retry import retry_web_scraping
@@ -191,7 +192,6 @@ class SitemapService:
                     if src:
                         if not src.startswith('http'):
                             # Construir URL absoluta
-                            from urllib.parse import urljoin
                             src = urljoin(url, src)
                         product_data['images'].append(src)
                 if product_data['images']:
