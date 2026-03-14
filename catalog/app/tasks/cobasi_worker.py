@@ -14,7 +14,7 @@ from urllib.parse import urljoin
 import logging
 from datetime import datetime
 from celery import Celery
-from app.config import DATABASE_URL
+from app.config import settings
 from app.logger import logger
 from app.services.product_deduplication import ProductDeduplicator
 
@@ -42,7 +42,7 @@ class CobasiExtractor:
     
     async def get_db_connection(self):
         """Conexão com banco de dados"""
-        return await asyncpg.connect(DATABASE_URL)
+        return await asyncpg.connect(settings.database_url)
     
     async def create_cobasi_table(self):
         """Cria tabela unificada usando o deduplicador"""

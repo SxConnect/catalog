@@ -6,7 +6,7 @@ import asyncpg
 import re
 from typing import Optional, Dict, List
 from app.logger import logger
-from app.config import DATABASE_URL
+from app.config import settings
 from difflib import SequenceMatcher
 import unicodedata
 
@@ -16,7 +16,7 @@ class ProductDeduplicator:
         
     async def get_db_connection(self):
         """Conexão com banco de dados"""
-        return await asyncpg.connect(DATABASE_URL)
+        return await asyncpg.connect(settings.database_url)
     
     async def create_unified_products_table(self):
         """Cria tabela unificada para todos os produtos"""

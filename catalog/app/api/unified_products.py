@@ -5,7 +5,7 @@ Consulta produtos de todas as fontes (Cobasi, catálogos, web)
 from fastapi import APIRouter, HTTPException, Query
 from app.logger import logger
 import asyncpg
-from app.config import DATABASE_URL
+from app.config import settings
 from typing import Optional
 
 router = APIRouter()
@@ -14,7 +14,7 @@ router = APIRouter()
 async def get_unified_products_status():
     """Status geral do sistema de produtos unificados"""
     try:
-        conn = await asyncpg.connect(DATABASE_URL)
+        conn = await asyncpg.connect(settings.database_url)
         
         try:
             # Verificar se tabela existe
@@ -124,7 +124,7 @@ async def search_unified_products(
 ):
     """Busca produtos em todas as fontes"""
     try:
-        conn = await asyncpg.connect(DATABASE_URL)
+        conn = await asyncpg.connect(settings.database_url)
         
         try:
             # Construir query com filtros
@@ -205,7 +205,7 @@ async def find_potential_duplicates(
 ):
     """Encontra possíveis duplicatas no banco"""
     try:
-        conn = await asyncpg.connect(DATABASE_URL)
+        conn = await asyncpg.connect(settings.database_url)
         
         try:
             # Buscar produtos com nomes similares

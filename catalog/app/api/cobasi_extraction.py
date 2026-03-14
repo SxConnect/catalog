@@ -9,7 +9,7 @@ from sqlalchemy import text
 from app.tasks.cobasi_worker import extract_cobasi_products
 import asyncio
 import asyncpg
-from app.config import DATABASE_URL
+from app.config import settings
 from typing import Optional
 
 router = APIRouter()
@@ -39,7 +39,7 @@ async def get_extraction_status():
     """Verifica status da extração da Cobasi"""
     try:
         # Conectar ao banco para verificar estatísticas
-        conn = await asyncpg.connect(DATABASE_URL)
+        conn = await asyncpg.connect(settings.database_url)
         
         try:
             # Verificar se tabela existe
@@ -112,7 +112,7 @@ async def list_cobasi_products(
 ):
     """Lista produtos extraídos da Cobasi"""
     try:
-        conn = await asyncpg.connect(DATABASE_URL)
+        conn = await asyncpg.connect(settings.database_url)
         
         try:
             # Construir query com filtros
@@ -182,7 +182,7 @@ async def list_cobasi_products(
 async def get_extraction_stats():
     """Estatísticas detalhadas da extração"""
     try:
-        conn = await asyncpg.connect(DATABASE_URL)
+        conn = await asyncpg.connect(settings.database_url)
         
         try:
             # Verificar se tabela existe
@@ -258,7 +258,7 @@ async def get_extraction_stats():
 async def reset_cobasi_data():
     """Remove todos os dados da Cobasi (usar com cuidado!)"""
     try:
-        conn = await asyncpg.connect(DATABASE_URL)
+        conn = await asyncpg.connect(settings.database_url)
         
         try:
             # Contar produtos antes de deletar
