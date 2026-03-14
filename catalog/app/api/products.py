@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/search")
-@rate_limit_products()
 @cache_search_results(ttl=180)  # Cache por 3 minutos
 def search_products(
     request: Request,
@@ -72,7 +71,6 @@ def search_products(
     }
 
 @router.get("/", response_model=List[dict])
-@rate_limit_products()
 @cache_products_list(ttl=300)  # Cache por 5 minutos
 def list_products(
     request: Request,
@@ -84,7 +82,6 @@ def list_products(
     return products
 
 @router.get("/{product_id}")
-@rate_limit_products()
 def get_product(product_id: int, request: Request, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
@@ -92,7 +89,6 @@ def get_product(product_id: int, request: Request, db: Session = Depends(get_db)
     return product
 
 @router.get("/export/csv")
-@rate_limit_products()
 def export_csv(request: Request, db: Session = Depends(get_db)):
     import csv
     import io
@@ -127,13 +123,11 @@ def export_csv(request: Request, db: Session = Depends(get_db)):
     )
 
 @router.get("/export/json")
-@rate_limit_products()
 def export_json(request: Request, db: Session = Depends(get_db)):
     products = db.query(Product).all()
     return {"products": [p.__dict__ for p in products]}
 
 @router.get("/{product_id}/ingredients")
-@rate_limit_products()
 def get_product_ingredients(request: Request, product_id: int, db: Session = Depends(get_db)):
     """
     Retorna ingredientes de um produto específico.
@@ -151,7 +145,6 @@ def get_product_ingredients(request: Request, product_id: int, db: Session = Dep
     }
 
 @router.get("/{product_id}/nutrition")
-@rate_limit_products()
 def get_product_nutrition(request: Request, product_id: int, db: Session = Depends(get_db)):
     """
     Retorna informações nutricionais de um produto específico.
@@ -169,7 +162,6 @@ def get_product_nutrition(request: Request, product_id: int, db: Session = Depen
     }
 
 @router.get("/ingredients/search")
-@rate_limit_products()
 def search_by_ingredient(
     request: Request,
     ingredient: str = Query(..., min_length=2),
@@ -197,7 +189,6 @@ def search_by_ingredient(
     }
 
 @router.get("/nutrition/compare")
-@rate_limit_products()
 def compare_nutrition(
     request: Request,
     product_ids: str = Query(..., description="IDs separados por vírgula, ex: 1,2,3"),
@@ -235,7 +226,6 @@ def compare_nutrition(
         return {"error": "IDs inválidos. Use números separados por vírgula"}
 
 @router.post("/{product_id}/parse-nutrition")
-@rate_limit_products()
 def parse_product_nutrition(
     request: Request,
     product_id: int,
@@ -278,7 +268,6 @@ def parse_product_nutrition(
         return {"error": f"Erro no parsing: {str(e)}"}
 
 @router.post("/{product_id}/parse-ingredients")
-@rate_limit_products()
 def parse_product_ingredients(
     request: Request,
     product_id: int,
@@ -321,7 +310,6 @@ def parse_product_ingredients(
         return {"error": f"Erro no parsing: {str(e)}"}
 
 @router.put("/{product_id}")
-@rate_limit_products()
 def update_product(
     request: Request,
     product_id: int,

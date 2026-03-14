@@ -39,7 +39,6 @@ def search_products(
     }
 
 @router.get("/by-ean/{ean}")
-@rate_limit_products()
 def search_by_ean(request: Request, ean: str, db: Session = Depends(get_db)):
     """Busca exata por EAN usando index"""
     product = db.query(Product).filter(Product.ean == ean).first()
@@ -48,7 +47,6 @@ def search_by_ean(request: Request, ean: str, db: Session = Depends(get_db)):
     return product
 
 @router.get("/by-brand/{brand}")
-@rate_limit_products()
 def search_by_brand(
     request: Request,
     brand: str,

@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/check")
-@rate_limit_products()
 @cache_deduplication_by_ean(ttl=86400)  # Cache por 24 horas
 def check_duplicate(
     request: Request,
@@ -41,7 +40,6 @@ def check_duplicate(
     return {"is_duplicate": False}
 
 @router.get("/similar")
-@rate_limit_products()
 def find_similar(
     request: Request,
     name: str = Query(..., min_length=2),
@@ -74,7 +72,6 @@ def find_similar(
     }
 
 @router.get("/find-all")
-@rate_limit_products()
 def find_all_duplicates(
     request: Request,
     threshold: float = Query(0.85, ge=0.0, le=1.0),
