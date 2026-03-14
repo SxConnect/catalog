@@ -46,7 +46,7 @@ async def get_extraction_status():
             table_exists = await conn.fetchval("""
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables 
-                    WHERE table_name = 'cobasi_products'
+                    WHERE table_name = 'unified_products'
                 )
             """)
             
@@ -57,20 +57,25 @@ async def get_extraction_status():
                     "products_count": 0
                 }
             
-            # Contar produtos extraídos
-            total_products = await conn.fetchval("SELECT COUNT(*) FROM cobasi_products")
+            # Contar produtos extraídos da Cobasi
+            total_products = await conn.fetchval("""
+                SELECT COUNT(*) FROM unified_products 
+                WHERE source_type = 'cobasi'
+            """)
             
             # Produtos extraídos hoje
             today_products = await conn.fetchval("""
-                SELECT COUNT(*) FROM cobasi_products 
-                WHERE DATE(extracted_at) = CURRENT_DATE
+                SELECT COUNT(*) FROM unified_products 
+                WHERE source_type = 'cobasi' 
+                AND DATE(created_at) = CURRENT_DATE
             """)
             
             # Últimos produtos extraídos
             recent_products = await conn.fetch("""
-                SELECT sku, name, brand, price, extracted_at
-                FROM cobasi_products 
-                ORDER BY extracted_at DESC 
+                SELECT sku, name, brand, price, created_at
+                FROM unified_products 
+                WHERE source_type = 'cobasi'
+                ORDER BY created_at DESC 
                 LIMIT 5
             """)
             
@@ -81,7 +86,7 @@ async def get_extraction_status():
                     "name": product['name'][:50] + "..." if product['name'] and len(product['name']) > 50 else product['name'],
                     "brand": product['brand'],
                     "price": float(product['price']) if product['price'] else None,
-                    "extracted_at": product['extracted_at'].isoformat()
+                    "extracted_at": product['created_at'].isoformat()
                 })
             
             return {
@@ -111,7 +116,7 @@ async def list_cobasi_products(
         
         try:
             # Construir query com filtros
-            where_conditions = []
+            where_conditions = ["source_type = 'cobasi'"]
             params = []
             param_count = 0
             
@@ -125,17 +130,15 @@ async def list_cobasi_products(
                 where_conditions.append(f"name ILIKE ${param_count}")
                 params.append(f"%{search}%")
             
-            where_clause = ""
-            if where_conditions:
-                where_clause = "WHERE " + " AND ".join(where_conditions)
+            where_clause = "WHERE " + " AND ".join(where_conditions)
             
             param_count += 1
             query = f"""
-                SELECT sku, name, brand, price, url, porte, tipo_racao, 
-                       peso_racao, sabor_racao, extracted_at
-                FROM cobasi_products 
+                SELECT sku, name, brand, price, source_url, porte, tipo_produto, 
+                       peso_produto, sabor, created_at
+                FROM unified_products 
                 {where_clause}
-                ORDER BY extracted_at DESC 
+                ORDER BY created_at DESC 
                 LIMIT ${param_count}
             """
             params.append(limit)
@@ -149,12 +152,12 @@ async def list_cobasi_products(
                     "name": product['name'],
                     "brand": product['brand'],
                     "price": float(product['price']) if product['price'] else None,
-                    "url": product['url'],
+                    "url": product['source_url'],
                     "porte": product['porte'],
-                    "tipo_racao": product['tipo_racao'],
-                    "peso_racao": product['peso_racao'],
-                    "sabor_racao": product['sabor_racao'],
-                    "extracted_at": product['extracted_at'].isoformat() if product['extracted_at'] else None
+                    "tipo_produto": product['tipo_produto'],
+                    "peso_produto": product['peso_produto'],
+                    "sabor": product['sabor'],
+                    "extracted_at": product['created_at'].isoformat() if product['created_at'] else None
                 })
             
             return {
@@ -186,7 +189,7 @@ async def get_extraction_stats():
             table_exists = await conn.fetchval("""
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables 
-                    WHERE table_name = 'cobasi_products'
+                    WHERE table_name = 'unified_products'
                 )
             """)
             
@@ -196,7 +199,7 @@ async def get_extraction_stats():
                     "message": "Extração ainda não foi iniciada"
                 }
             
-            # Estatísticas gerais
+            # Estatísticas gerais da Cobasi
             stats = await conn.fetchrow("""
                 SELECT 
                     COUNT(*) as total_products,
@@ -204,28 +207,28 @@ async def get_extraction_stats():
                     AVG(price) as avg_price,
                     MIN(price) as min_price,
                     MAX(price) as max_price,
-                    MIN(extracted_at) as first_extraction,
-                    MAX(extracted_at) as last_extraction
-                FROM cobasi_products
-                WHERE price IS NOT NULL
+                    MIN(created_at) as first_extraction,
+                    MAX(created_at) as last_extraction
+                FROM unified_products
+                WHERE source_type = 'cobasi' AND price IS NOT NULL
             """)
             
             # Top marcas
             top_brands = await conn.fetch("""
                 SELECT brand, COUNT(*) as product_count
-                FROM cobasi_products 
-                WHERE brand IS NOT NULL
+                FROM unified_products 
+                WHERE source_type = 'cobasi' AND brand IS NOT NULL
                 GROUP BY brand 
                 ORDER BY product_count DESC 
                 LIMIT 10
             """)
             
-            # Produtos por tipo de ração
-            tipos_racao = await conn.fetch("""
-                SELECT tipo_racao, COUNT(*) as count
-                FROM cobasi_products 
-                WHERE tipo_racao IS NOT NULL
-                GROUP BY tipo_racao 
+            # Produtos por tipo
+            tipos_produto = await conn.fetch("""
+                SELECT tipo_produto, COUNT(*) as count
+                FROM unified_products 
+                WHERE source_type = 'cobasi' AND tipo_produto IS NOT NULL
+                GROUP BY tipo_produto 
                 ORDER BY count DESC
             """)
             
@@ -241,7 +244,7 @@ async def get_extraction_stats():
                     "last_extraction": stats['last_extraction'].isoformat() if stats['last_extraction'] else None
                 },
                 "top_brands": [{"brand": row['brand'], "count": row['product_count']} for row in top_brands],
-                "tipos_racao": [{"tipo": row['tipo_racao'], "count": row['count']} for row in tipos_racao]
+                "tipos_produto": [{"tipo": row['tipo_produto'], "count": row['count']} for row in tipos_produto]
             }
             
         finally:
@@ -259,10 +262,13 @@ async def reset_cobasi_data():
         
         try:
             # Contar produtos antes de deletar
-            count_before = await conn.fetchval("SELECT COUNT(*) FROM cobasi_products")
+            count_before = await conn.fetchval("""
+                SELECT COUNT(*) FROM unified_products 
+                WHERE source_type = 'cobasi'
+            """)
             
-            # Deletar todos os produtos
-            await conn.execute("DELETE FROM cobasi_products")
+            # Deletar todos os produtos da Cobasi
+            await conn.execute("DELETE FROM unified_products WHERE source_type = 'cobasi'")
             
             logger.warning(f"🗑️ Removidos {count_before} produtos da Cobasi do banco")
             

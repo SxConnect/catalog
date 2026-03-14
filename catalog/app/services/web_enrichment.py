@@ -1,254 +1,266 @@
-import httpx
-from bs4 import BeautifulSoup
-from typing import Dict, Optional, List
-import re
-from app.logger import logger
-from app.utils.retry import retry_web_scraping
-from app.monitoring.metrics import monitor_scraping, monitor_enrichment
-from app.services.nutrition_parser import nutrition_parser
+"""
+Serviço de enriquecimento web para produtos
+Busca informações adicionais na internet para produtos de catálogos
+"""
+import aiohttp
 import asyncio
+from bs4 import BeautifulSoup
+import re
+from typing import Dict, List, Optional
+from app.logger import logger
+from urllib.parse import quote_plus
+import json
 
 class WebEnrichmentService:
     def __init__(self):
-        self.client = httpx.AsyncClient(timeout=10.0, follow_redirects=True)
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
         }
-    
-    async def search_google(self, query: str) -> List[str]:
-        """Busca URLs no Google (simulado - use Google Custom Search API em produção)"""
-        try:
-            # Em produção, usar Google Custom Search API
-            # Por enquanto, retorna URLs conhecidas de pet shops
-            pet_sites = [
-                f"https://www.petlove.com.br/busca?q={query.replace(' ', '+')}",
-                f"https://www.petz.com.br/busca?q={query.replace(' ', '+')}",
-                f"https://www.cobasi.com.br/busca?q={query.replace(' ', '+')}",
-            ]
-            return pet_sites
-        except Exception as e:
-            logger.error(f"Google search error: {e}")
-            return []
-    
-    @retry_web_scraping(max_attempts=5)
-    @monitor_scraping
-    async def scrape_product_page(self, url: str) -> Dict:
-        """
-        Extrai dados de uma página de produto com retry automático e circuit breaker.
         
-        Args:
-            url: URL da página do produto
-            
-        Returns:
-            Dicionário com dados extraídos da página
-        """
-        try:
-            logger.debug(f"Scraping product page: {url}")
-            response = await self.client.get(url, headers=self.headers)
-            response.raise_for_status()  # Levanta exceção para status HTTP de erro
-            
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            data = {}
-            
-            # Tentar extrair preço
-            price_patterns = [
-                r'R\$\s*(\d+[.,]\d{2})',
-                r'(\d+[.,]\d{2})\s*reais',
-            ]
-            for pattern in price_patterns:
-                match = re.search(pattern, response.text)
-                if match:
-                    data['price'] = match.group(1).replace(',', '.')
-                    break
-            
-            # Tentar extrair descrição
-            desc_selectors = [
-                'div.product-description',
-                'div.description',
-                'div[itemprop="description"]',
-                'meta[name="description"]',
-            ]
-            for selector in desc_selectors:
-                elem = soup.select_one(selector)
-                if elem:
-                    data['description'] = elem.get_text(strip=True)[:500]
-                    break
-            
-            # Tentar extrair imagens
-            img_selectors = [
-                'img.product-image',
-                'img[itemprop="image"]',
-                'div.product-gallery img',
-            ]
-            images = []
-            for selector in img_selectors:
-                imgs = soup.select(selector)
-                for img in imgs[:3]:  # Máximo 3 imagens
-                    src = img.get('src') or img.get('data-src')
-                    if src and src.startswith('http'):
-                        images.append(src)
-            data['images'] = images
-            
-            # Tentar extrair peso/dimensões
-            weight_pattern = r'(\d+[.,]?\d*)\s*(kg|g|gramas|quilos)'
-            match = re.search(weight_pattern, response.text, re.IGNORECASE)
-            if match:
-                data['weight'] = f"{match.group(1)} {match.group(2)}"
-            
-            # Tentar extrair ingredientes
-            ingredients_patterns = [
-                r'ingredientes?[:\s]+([^.]+)',
-                r'composição[:\s]+([^.]+)',
-                r'ingredients?[:\s]+([^.]+)',
-            ]
-            
-            for pattern in ingredients_patterns:
-                match = re.search(pattern, response.text, re.IGNORECASE)
-                if match:
-                    ingredients_text = match.group(1).strip()
-                    if len(ingredients_text) > 10:  # Filtrar matches muito curtos
-                        data['ingredients_text'] = ingredients_text[:500]  # Limitar tamanho
-                        break
-            
-            # Tentar extrair informações nutricionais do HTML
-            try:
-                nutritional_info = nutrition_parser.parse_nutritional_table(response.text)
-                if nutritional_info:
-                    data['nutritional_info'] = nutritional_info
-            except Exception as e:
-                logger.debug(f"Failed to parse nutritional info from {url}: {e}")
-            
-            logger.info(f"Successfully scraped data from {url}: {len(data)} fields")
-            return data
-            
-        except Exception as e:
-            logger.error(f"Scraping error for {url}: {e}")
-            raise  # Re-raise para que o retry funcione
+        # Sites para busca de enriquecimento
+        self.search_sites = [
+            'https://www.cobasi.com.br',
+            'https://www.petlove.com.br',
+            'https://www.petz.com.br'
+        ]
     
-    @monitor_enrichment
-    async def search_product(
-        self, 
-        product_name: str, 
-        brand: str,
-        ean: Optional[str] = None
-    ) -> Optional[Dict]:
-        """
-        Busca informações do produto na web
+    async def enrich_product(self, product_data: Dict) -> Dict:
+        """Enriquece produto com dados da web"""
+        logger.info(f"🌐 Iniciando enriquecimento web para: {product_data.get('name')}")
         
-        Retorna dados enriquecidos:
-        - description: Descrição completa
-        - images: Lista de URLs de imagens
-        - price: Preço médio encontrado
-        - weight: Peso do produto
-        - ingredients: Ingredientes (se disponível)
-        - nutritional_info: Info nutricional
-        """
         try:
-            logger.info(f"Enriching product: {product_name} - {brand}")
+            # Buscar informações em sites de pet
+            enrichment_data = await self.search_product_info(
+                product_data.get('name', ''),
+                product_data.get('brand', '')
+            )
             
-            # Construir query de busca
-            query = f"{product_name} {brand}"
-            if ean:
-                query += f" {ean}"
-            query += " pet"
-            
-            # Buscar URLs
-            urls = await self.search_google(query)
-            
-            # Scrape das primeiras 3 URLs
-            enriched_data = {
-                "additional_images": [],
-                "full_description": "",
-                "price_avg": None,
-                "weight": None,
-                "ean_confirmed": ean,
-                "sources": [],
-                "ingredients": [],
-                "nutritional_info": {}
-            }
-            
-            prices = []
-            descriptions = []
-            
-            for url in urls[:3]:
-                data = await self.scrape_product_page(url)
+            if enrichment_data:
+                # Mesclar dados encontrados com dados originais
+                enriched_product = self.merge_enrichment_data(product_data, enrichment_data)
+                enriched_product['is_enriched'] = True
+                enriched_product['enrichment_source'] = enrichment_data.get('source_url', 'web_search')
                 
-                if data.get('price'):
-                    try:
-                        prices.append(float(data['price']))
-                    except:
-                        pass
+                logger.info(f"✅ Produto enriquecido com sucesso: {enriched_product.get('name')}")
+                return enriched_product
+            else:
+                # Não encontrou dados adicionais
+                product_data['is_enriched'] = False
+                product_data['enrichment_source'] = 'web_search_no_results'
                 
-                if data.get('description'):
-                    descriptions.append(data['description'])
+                logger.info(f"⚠️ Nenhum dado adicional encontrado para: {product_data.get('name')}")
+                return product_data
                 
-                if data.get('images'):
-                    enriched_data['additional_images'].extend(data['images'])
+        except Exception as e:
+            logger.error(f"❌ Erro no enriquecimento web: {e}")
+            product_data['is_enriched'] = False
+            product_data['enrichment_source'] = f'web_search_error: {str(e)}'
+            return product_data
+    
+    async def search_product_info(self, product_name: str, brand: str = None) -> Optional[Dict]:
+        """Busca informações do produto em sites de pet"""
+        
+        # Construir termos de busca
+        search_terms = self.build_search_terms(product_name, brand)
+        
+        async with aiohttp.ClientSession(headers=self.headers) as session:
+            for search_term in search_terms:
+                logger.info(f"🔍 Buscando: {search_term}")
                 
-                if data.get('weight') and not enriched_data['weight']:
-                    enriched_data['weight'] = data['weight']
+                # Tentar buscar na Cobasi primeiro (dados mais ricos)
+                cobasi_result = await self.search_cobasi(session, search_term)
+                if cobasi_result:
+                    return cobasi_result
                 
-                # Processar ingredientes
-                if data.get('ingredients_text'):
-                    try:
-                        ingredients = nutrition_parser.parse_ingredients(data['ingredients_text'])
-                        if ingredients:
-                            enriched_data['ingredients'].extend(ingredients)
-                    except Exception as e:
-                        logger.debug(f"Failed to parse ingredients: {e}")
+                # Se não encontrou na Cobasi, tentar outros sites
+                for site in self.search_sites[1:]:  # Pular Cobasi que já foi testada
+                    result = await self.search_generic_site(session, site, search_term)
+                    if result:
+                        return result
                 
-                # Consolidar informações nutricionais
-                if data.get('nutritional_info'):
-                    enriched_data['nutritional_info'].update(data['nutritional_info'])
-                
-                enriched_data['sources'].append(url)
+                # Pequena pausa entre buscas
+                await asyncio.sleep(1)
+        
+        return None
+    
+    def build_search_terms(self, product_name: str, brand: str = None) -> List[str]:
+        """Constrói termos de busca otimizados"""
+        terms = []
+        
+        if not product_name:
+            return terms
+        
+        # Limpar nome do produto
+        clean_name = re.sub(r'[^\w\s]', ' ', product_name)
+        clean_name = re.sub(r'\s+', ' ', clean_name).strip()
+        
+        # Termo 1: Nome completo
+        terms.append(clean_name)
+        
+        # Termo 2: Nome + marca (se disponível)
+        if brand:
+            terms.append(f"{brand} {clean_name}")
+        
+        # Termo 3: Palavras-chave principais
+        keywords = self.extract_keywords(clean_name)
+        if len(keywords) >= 2:
+            terms.append(' '.join(keywords[:3]))  # Top 3 keywords
+        
+        # Termo 4: Apenas marca + tipo de produto (se identificável)
+        if brand:
+            product_type = self.identify_product_type(clean_name)
+            if product_type:
+                terms.append(f"{brand} {product_type}")
+        
+        return terms[:3]  # Máximo 3 termos para não sobrecarregar
+    
+    def extract_keywords(self, text: str) -> List[str]:
+        """Extrai palavras-chave importantes do texto"""
+        # Palavras importantes para produtos pet
+        important_words = [
+            'ração', 'racao', 'petisco', 'snack', 'biscoito',
+            'frango', 'carne', 'peixe', 'salmão', 'cordeiro',
+            'adulto', 'filhote', 'senior', 'puppy', 'kitten',
+            'pequeno', 'medio', 'grande', 'mini', 'maxi',
+            'premium', 'super', 'natural', 'organic'
+        ]
+        
+        words = text.lower().split()
+        keywords = []
+        
+        for word in words:
+            if len(word) > 3 and (word in important_words or word.isalpha()):
+                keywords.append(word)
+        
+        return keywords
+    
+    def identify_product_type(self, text: str) -> Optional[str]:
+        """Identifica tipo de produto"""
+        text_lower = text.lower()
+        
+        if 'ração' in text_lower or 'racao' in text_lower:
+            return 'ração'
+        elif 'petisco' in text_lower or 'snack' in text_lower:
+            return 'petisco'
+        elif 'biscoito' in text_lower:
+            return 'biscoito'
+        
+        return None
+    
+    async def search_cobasi(self, session: aiohttp.ClientSession, search_term: str) -> Optional[Dict]:
+        """Busca específica na Cobasi"""
+        try:
+            # URL de busca da Cobasi
+            search_url = f"https://www.cobasi.com.br/busca?q={quote_plus(search_term)}"
             
-            # Calcular preço médio
-            if prices:
-                enriched_data['price_avg'] = sum(prices) / len(prices)
-            
-            # Consolidar descrições
-            if descriptions:
-                enriched_data['full_description'] = max(descriptions, key=len)
-            
-            # Remover duplicatas de imagens
-            enriched_data['additional_images'] = list(set(enriched_data['additional_images']))[:5]
-            
-            # Remover duplicatas de ingredientes
-            if enriched_data['ingredients']:
-                enriched_data['ingredients'] = list(set(enriched_data['ingredients']))
-            
-            logger.info(f"Enrichment completed: {len(enriched_data['additional_images'])} images, "
-                       f"price: {enriched_data['price_avg']}, "
-                       f"{len(enriched_data['ingredients'])} ingredients, "
-                       f"{len(enriched_data['nutritional_info'])} nutritional values")
-            
-            return enriched_data
+            async with session.get(search_url) as response:
+                if response.status == 200:
+                    html = await response.text()
+                    soup = BeautifulSoup(html, 'html.parser')
+                    
+                    # Procurar primeiro produto nos resultados
+                    product_links = soup.find_all('a', href=re.compile(r'/p\?idsku=\d+'))
+                    
+                    if product_links:
+                        first_product_url = product_links[0].get('href')
+                        if not first_product_url.startswith('http'):
+                            first_product_url = 'https://www.cobasi.com.br' + first_product_url
+                        
+                        # Extrair dados do produto
+                        product_data = await self.extract_cobasi_product_data(session, first_product_url)
+                        if product_data:
+                            product_data['source_url'] = first_product_url
+                            return product_data
             
         except Exception as e:
-            logger.error(f"Web enrichment error: {e}")
-            return None
-    
-    def search_product_sync(self, product_name: str, brand: str, ean: Optional[str] = None) -> Optional[Dict]:
-        """Versão síncrona para compatibilidade"""
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            logger.error(f"❌ Erro na busca Cobasi: {e}")
         
-        return loop.run_until_complete(self.search_product(product_name, brand, ean))
+        return None
     
-    async def close(self):
-        await self.client.aclose()
-    
-    def close_sync(self):
-        """Versão síncrona do close"""
+    async def extract_cobasi_product_data(self, session: aiohttp.ClientSession, product_url: str) -> Optional[Dict]:
+        """Extrai dados detalhados de produto da Cobasi"""
         try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            async with session.get(product_url) as response:
+                if response.status == 200:
+                    html = await response.text()
+                    soup = BeautifulSoup(html, 'html.parser')
+                    text_content = soup.get_text()
+                    
+                    # Extrair dados usando padrões da Cobasi
+                    data = {}
+                    
+                    # Ficha técnica
+                    ficha_patterns = {
+                        'porte': r'Porte\s*([^\n]+)',
+                        'tipo_produto': r'Tipo da Ração\s*([^\n]+)',
+                        'peso_produto': r'Peso da Ração\s*([^\n]+)',
+                        'sabor': r'Sabor da Ração\s*([^\n]+)',
+                        'idade_pet': r'Idade\s*([^\n]+)',
+                        'linha_produto': r'Linha\s*([^\n]+)'
+                    }
+                    
+                    for key, pattern in ficha_patterns.items():
+                        match = re.search(pattern, text_content, re.IGNORECASE)
+                        if match:
+                            data[key] = match.group(1).strip()
+                    
+                    # Dados nutricionais
+                    nutri_patterns = {
+                        'proteina_bruta': r'Proteína Bruta[^0-9]*(\d+[.,]?\d*)\s*g/kg',
+                        'fosforo': r'Fósforo[^0-9]*(\d+[.,]?\d*)\s*mg/kg',
+                        'calcio_min': r'Cálcio[^0-9]*(\d+[.,]?\d*)\s*mg/kg',
+                        'energia_metabolizavel': r'Energia Metabolizável[^0-9]*(\d+[.,]?\d*)\s*kcal/kg'
+                    }
+                    
+                    for key, pattern in nutri_patterns.items():
+                        match = re.search(pattern, text_content, re.IGNORECASE)
+                        if match:
+                            data[key] = match.group(1)
+                    
+                    # Composição
+                    comp_match = re.search(r'Composição Básica\s*([^A-Z]{100,500})', text_content, re.IGNORECASE | re.DOTALL)
+                    if comp_match:
+                        data['composicao_completa'] = comp_match.group(1).strip()
+                    
+                    # Descrição
+                    desc_match = re.search(r'Detalhes do produto\s*([^A-Z]{50,200})', text_content, re.IGNORECASE | re.DOTALL)
+                    if desc_match:
+                        data['descricao_completa'] = desc_match.group(1).strip()
+                    
+                    return data if data else None
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao extrair dados da Cobasi: {e}")
         
-        loop.run_until_complete(self.close())
+        return None
+    
+    async def search_generic_site(self, session: aiohttp.ClientSession, site_url: str, search_term: str) -> Optional[Dict]:
+        """Busca genérica em outros sites"""
+        # TODO: Implementar busca em outros sites (Petlove, Petz, etc.)
+        # Por enquanto, retorna None
+        return None
+    
+    def merge_enrichment_data(self, original_data: Dict, enrichment_data: Dict) -> Dict:
+        """Mescla dados originais com dados de enriquecimento"""
+        merged = original_data.copy()
+        
+        # Campos que podem ser enriquecidos (só sobrescrever se original estiver vazio)
+        enrichable_fields = [
+            'porte', 'tipo_produto', 'peso_produto', 'sabor', 'idade_pet',
+            'linha_produto', 'proteina_bruta', 'fosforo', 'calcio_min',
+            'energia_metabolizavel', 'composicao_completa', 'descricao_completa'
+        ]
+        
+        for field in enrichable_fields:
+            if enrichment_data.get(field) and not merged.get(field):
+                merged[field] = enrichment_data[field]
+        
+        # Adicionar dados de enriquecimento aos dados brutos
+        if 'raw_data' not in merged:
+            merged['raw_data'] = {}
+        
+        merged['raw_data']['enrichment_data'] = enrichment_data
+        
+        return merged

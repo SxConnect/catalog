@@ -1,6 +1,7 @@
 """
 Worker para extração em massa da Cobasi
 Roda em paralelo com o processamento de PDFs
+Usa sistema de deduplicação unificado
 """
 import asyncio
 import asyncpg
@@ -15,6 +16,7 @@ from datetime import datetime
 from celery import Celery
 from app.config import DATABASE_URL
 from app.logger import logger
+from app.services.product_deduplication import ProductDeduplicator
 
 # Configurar Celery para tarefas assíncronas
 celery_app = Celery('cobasi_extractor')
@@ -27,10 +29,13 @@ class CobasiExtractor:
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
         }
+        self.deduplicator = ProductDeduplicator()
         self.stats = {
             'categories_processed': 0,
             'products_found': 0,
             'products_saved': 0,
+            'products_updated': 0,
+            'duplicates_found': 0,
             'errors': 0,
             'start_time': datetime.now()
         }
@@ -40,55 +45,9 @@ class CobasiExtractor:
         return await asyncpg.connect(DATABASE_URL)
     
     async def create_cobasi_table(self):
-        """Cria tabela específica para produtos da Cobasi"""
-        conn = await self.get_db_connection()
-        try:
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS cobasi_products (
-                    id SERIAL PRIMARY KEY,
-                    sku VARCHAR(50) UNIQUE NOT NULL,
-                    name VARCHAR(1000),
-                    brand VARCHAR(200),
-                    price DECIMAL(10,2),
-                    url VARCHAR(1000),
-                    images TEXT[],
-                    
-                    -- Ficha técnica
-                    porte VARCHAR(200),
-                    tipo_racao VARCHAR(200),
-                    peso_racao VARCHAR(200),
-                    sabor_racao VARCHAR(500),
-                    idade VARCHAR(100),
-                    linha VARCHAR(200),
-                    
-                    -- Nutricionais
-                    proteina_bruta VARCHAR(50),
-                    fosforo VARCHAR(50),
-                    calcio VARCHAR(50),
-                    energia_metabolizavel VARCHAR(50),
-                    
-                    -- Composição
-                    ingredientes TEXT,
-                    descricao TEXT,
-                    beneficios TEXT[],
-                    
-                    -- Metadados
-                    categoria VARCHAR(500),
-                    extracted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                    
-                    -- Dados completos em JSON
-                    raw_data JSONB
-                )
-            """)
-            
-            # Índices
-            await conn.execute("CREATE INDEX IF NOT EXISTS idx_cobasi_sku ON cobasi_products(sku)")
-            await conn.execute("CREATE INDEX IF NOT EXISTS idx_cobasi_brand ON cobasi_products(brand)")
-            
-            logger.info("✅ Tabela cobasi_products criada/verificada")
-        finally:
-            await conn.close()
+        """Cria tabela unificada usando o deduplicador"""
+        await self.deduplicator.create_unified_products_table()
+        logger.info("✅ Tabela unificada criada/verificada")
     
     async def extract_category_urls(self):
         """Extrai todas as URLs de categorias da Cobasi"""
@@ -160,16 +119,37 @@ class CobasiExtractor:
                 # Dados básicos
                 product_data = {
                     'sku': sku,
-                    'url': product_url,
                     'name': None,
                     'brand': None,
                     'price': None,
+                    'source_url': product_url,
                     'images': [],
-                    'ficha_tecnica': {},
-                    'nutricionais': {},
-                    'composicao': None,
-                    'descricao': None,
-                    'beneficios': []
+                    
+                    # Ficha técnica
+                    'porte': None,
+                    'tipo_produto': None,
+                    'peso_produto': None,
+                    'sabor': None,
+                    'idade_pet': None,
+                    'linha_produto': None,
+                    
+                    # Nutricionais
+                    'proteina_bruta': None,
+                    'fosforo': None,
+                    'calcio_min': None,
+                    'energia_metabolizavel': None,
+                    
+                    # Composição
+                    'ingredientes_principais': None,
+                    'composicao_completa': None,
+                    'descricao_completa': None,
+                    'beneficios': [],
+                    
+                    # Metadados
+                    'categoria_principal': 'Pet',
+                    'is_enriched': True,
+                    'enrichment_source': 'cobasi_direct',
+                    'raw_data': {}
                 }
                 
                 # Nome do produto
@@ -205,40 +185,46 @@ class CobasiExtractor:
                 # Ficha técnica
                 ficha_patterns = {
                     'porte': r'Porte\s*([^\n]+)',
-                    'tipo_racao': r'Tipo da Ração\s*([^\n]+)',
-                    'peso_racao': r'Peso da Ração\s*([^\n]+)',
-                    'sabor_racao': r'Sabor da Ração\s*([^\n]+)',
-                    'idade': r'Idade\s*([^\n]+)',
-                    'linha': r'Linha\s*([^\n]+)'
+                    'tipo_produto': r'Tipo da Ração\s*([^\n]+)',
+                    'peso_produto': r'Peso da Ração\s*([^\n]+)',
+                    'sabor': r'Sabor da Ração\s*([^\n]+)',
+                    'idade_pet': r'Idade\s*([^\n]+)',
+                    'linha_produto': r'Linha\s*([^\n]+)'
                 }
                 
                 for key, pattern in ficha_patterns.items():
                     match = re.search(pattern, text_content, re.IGNORECASE)
                     if match:
-                        product_data['ficha_tecnica'][key] = match.group(1).strip()
+                        product_data[key] = match.group(1).strip()
                 
                 # Dados nutricionais
                 nutri_patterns = {
                     'proteina_bruta': r'Proteína Bruta[^0-9]*(\d+[.,]?\d*)\s*g/kg',
                     'fosforo': r'Fósforo[^0-9]*(\d+[.,]?\d*)\s*mg/kg',
-                    'calcio': r'Cálcio[^0-9]*(\d+[.,]?\d*)\s*mg/kg',
+                    'calcio_min': r'Cálcio[^0-9]*(\d+[.,]?\d*)\s*mg/kg',
                     'energia_metabolizavel': r'Energia Metabolizável[^0-9]*(\d+[.,]?\d*)\s*kcal/kg'
                 }
                 
                 for key, pattern in nutri_patterns.items():
                     match = re.search(pattern, text_content, re.IGNORECASE)
                     if match:
-                        product_data['nutricionais'][key] = match.group(1)
+                        product_data[key] = match.group(1)
                 
                 # Composição
                 comp_match = re.search(r'Composição Básica\s*([^A-Z]{100,800})', text_content, re.IGNORECASE | re.DOTALL)
                 if comp_match:
-                    product_data['composicao'] = comp_match.group(1).strip()
+                    product_data['composicao_completa'] = comp_match.group(1).strip()
                 
                 # Descrição
                 desc_match = re.search(r'Detalhes do produto\s*([^A-Z]{50,300})', text_content, re.IGNORECASE | re.DOTALL)
                 if desc_match:
-                    product_data['descricao'] = desc_match.group(1).strip()
+                    product_data['descricao_completa'] = desc_match.group(1).strip()
+                
+                # Salvar dados brutos
+                product_data['raw_data'] = {
+                    'html_text': text_content[:2000],  # Primeiros 2000 chars para análise
+                    'extraction_date': datetime.now().isoformat()
+                }
                 
                 return product_data
                 
@@ -247,55 +233,28 @@ class CobasiExtractor:
             return None
     
     async def save_product(self, product_data):
-        """Salva produto no banco de dados"""
-        conn = await self.get_db_connection()
+        """Salva produto usando sistema de deduplicação"""
         try:
-            await conn.execute("""
-                INSERT INTO cobasi_products (
-                    sku, name, brand, price, url, images,
-                    porte, tipo_racao, peso_racao, sabor_racao, idade, linha,
-                    proteina_bruta, fosforo, calcio, energia_metabolizavel,
-                    ingredientes, descricao, raw_data
-                ) VALUES (
-                    $1, $2, $3, $4, $5, $6,
-                    $7, $8, $9, $10, $11, $12,
-                    $13, $14, $15, $16,
-                    $17, $18, $19
-                ) ON CONFLICT (sku) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    brand = EXCLUDED.brand,
-                    price = EXCLUDED.price,
-                    updated_at = NOW()
-            """,
-                product_data['sku'],
-                product_data['name'],
-                product_data['brand'],
-                product_data['price'],
-                product_data['url'],
-                product_data['images'],
-                product_data['ficha_tecnica'].get('porte'),
-                product_data['ficha_tecnica'].get('tipo_racao'),
-                product_data['ficha_tecnica'].get('peso_racao'),
-                product_data['ficha_tecnica'].get('sabor_racao'),
-                product_data['ficha_tecnica'].get('idade'),
-                product_data['ficha_tecnica'].get('linha'),
-                product_data['nutricionais'].get('proteina_bruta'),
-                product_data['nutricionais'].get('fosforo'),
-                product_data['nutricionais'].get('calcio'),
-                product_data['nutricionais'].get('energia_metabolizavel'),
-                product_data['composicao'],
-                product_data['descricao'],
-                json.dumps(product_data)
+            result = await self.deduplicator.save_or_update_product(
+                product_data, 
+                source_type='cobasi',
+                source_id=product_data.get('sku')
             )
             
-            self.stats['products_saved'] += 1
-            logger.info(f"💾 Produto salvo: {product_data['name']} (SKU: {product_data['sku']})")
+            if result.get('id'):
+                if result.get('created_at') == result.get('updated_at'):
+                    self.stats['products_saved'] += 1
+                    logger.info(f"💾 Novo produto Cobasi: {product_data['name']} (SKU: {product_data['sku']})")
+                else:
+                    self.stats['products_updated'] += 1
+                    logger.info(f"🔄 Produto Cobasi atualizado: {product_data['name']} (SKU: {product_data['sku']})")
+            else:
+                self.stats['duplicates_found'] += 1
+                logger.info(f"📋 Produto Cobasi já existe: {product_data['name']} (SKU: {product_data['sku']})")
             
         except Exception as e:
-            logger.error(f"❌ Erro ao salvar produto {product_data['sku']}: {e}")
+            logger.error(f"❌ Erro ao salvar produto Cobasi {product_data.get('sku')}: {e}")
             self.stats['errors'] += 1
-        finally:
-            await conn.close()
 
 @celery_app.task(bind=True)
 def extract_cobasi_products(self):
@@ -338,10 +297,12 @@ def extract_cobasi_products(self):
         
         # Log final
         elapsed = datetime.now() - extractor.stats['start_time']
-        logger.info(f"🎉 Extração concluída!")
+        logger.info(f"🎉 Extração da Cobasi concluída!")
         logger.info(f"📊 Estatísticas:")
         logger.info(f"   - Categorias processadas: {extractor.stats['categories_processed']}")
-        logger.info(f"   - Produtos salvos: {extractor.stats['products_saved']}")
+        logger.info(f"   - Produtos novos: {extractor.stats['products_saved']}")
+        logger.info(f"   - Produtos atualizados: {extractor.stats['products_updated']}")
+        logger.info(f"   - Duplicatas encontradas: {extractor.stats['duplicates_found']}")
         logger.info(f"   - Erros: {extractor.stats['errors']}")
         logger.info(f"   - Tempo total: {elapsed}")
     
