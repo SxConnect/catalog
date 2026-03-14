@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi import Depends, HTTPException
-from app.api import catalog, products, admin, search, deduplication, status, health
+from app.api import catalog, products, admin, search, deduplication, status, health, cobasi_extraction
 from app.api import url_extractor_proxy as sitemap
 from app.monitoring.metrics import get_prometheus_metrics, get_metrics_content_type
 import secrets
@@ -43,6 +43,7 @@ app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(sitemap.router, prefix="/api/sitemap", tags=["sitemap"])
 app.include_router(status.router, prefix="/api/status", tags=["status"])
 app.include_router(health.router, prefix="/api/health", tags=["health"])
+app.include_router(cobasi_extraction.router, prefix="/api/cobasi", tags=["cobasi"])
 
 # Autenticação para métricas Prometheus
 security = HTTPBasic()
