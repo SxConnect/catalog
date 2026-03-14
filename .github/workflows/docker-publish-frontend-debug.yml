@@ -39,8 +39,8 @@ jobs:
       - name: Build and push Docker image (Debug)
         uses: docker/build-push-action@v5
         with:
-          context: ./catalog-frontend
-          file: ./catalog-frontend/Dockerfile.simple
+          context: ./catalog/frontend
+          file: ./catalog/frontend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
