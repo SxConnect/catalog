@@ -9,7 +9,6 @@ from datetime import datetime
 router = APIRouter()
 
 @router.get("/catalog/{catalog_id}/status")
-@rate_limit_products()
 def get_catalog_status(request: Request, catalog_id: int, db: Session = Depends(get_db)):
     """
     Retorna status detalhado do processamento do catálogo
@@ -58,7 +57,6 @@ def get_catalog_status(request: Request, catalog_id: int, db: Session = Depends(
     }
 
 @router.get("/catalog/{catalog_id}/products")
-@rate_limit_products()
 def get_catalog_products(
     request: Request,
     catalog_id: int,
@@ -88,7 +86,6 @@ def get_catalog_products(
     }
 
 @router.get("/recent")
-@rate_limit_products()
 def get_recent_catalogs(request: Request, limit: int = 10, db: Session = Depends(get_db)):
     """
     Lista catálogos recentes com status
@@ -120,7 +117,6 @@ def get_recent_catalogs(request: Request, limit: int = 10, db: Session = Depends
     return {"catalogs": result}
 
 @router.get("/stats")
-@rate_limit_products()
 def get_processing_stats(request: Request, db: Session = Depends(get_db)):
     """
     Estatísticas gerais de processamento

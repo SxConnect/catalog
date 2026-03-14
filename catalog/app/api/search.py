@@ -9,7 +9,6 @@ from typing import List, Optional
 router = APIRouter()
 
 @router.get("/")
-@rate_limit_products()
 def search_products(
     request: Request,
     q: str = Query(..., min_length=2),
