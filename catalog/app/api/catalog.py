@@ -142,7 +142,6 @@ async def upload_catalog(
         raise
 
 @router.get("/list")
-@rate_limit_products()
 def list_catalogs(
     request: Request,
     skip: int = Query(0, ge=0),
