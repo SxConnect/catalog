@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, desc, asc
 from app.database import get_db
 from app.models import Product
-from app.middleware.security import rate_limit_products
 from app.utils.cache import cache_products_list, cache_search_results, invalidate_products_cache
 from app.services.nutrition_parser import nutrition_parser
 from typing import List, Optional

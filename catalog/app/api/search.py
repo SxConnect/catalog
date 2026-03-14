@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from app.database import get_db
 from app.models import Product
-from app.middleware.security import rate_limit_products
 from typing import List, Optional
 
 router = APIRouter()

@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Catalog, Product
-from app.middleware.security import rate_limit_products
 from typing import List, Dict
 from datetime import datetime
 
