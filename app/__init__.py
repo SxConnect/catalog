@@ -1,1 +1,0 @@
-# sixpet-catalog-engine

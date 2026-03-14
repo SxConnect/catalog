@@ -5,7 +5,7 @@ services:
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: sixpet
-      POSTGRES_PASSWORD: sixpet123
+      POSTGRES_PASSWORD: w5lYyxpY1WA3U6rHSXvMZlPJ/kYQpESn9LrnqAtNsf8=
       POSTGRES_DB: sixpet_catalog
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -63,7 +63,7 @@ services:
     ports:
       - "8001:8001"
     environment:
-      - DATABASE_URL=postgresql://sixpet:sixpet123@postgres:5432/sixpet_catalog
+      - DATABASE_URL=postgresql://sixpet:w5lYyxpY1WA3U6rHSXvMZlPJ%2FkYQpESn9LrnqAtNsf8%3D@postgres:5432/sixpet_catalog
     depends_on:
       - postgres
 
