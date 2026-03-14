@@ -158,7 +158,6 @@ def list_catalogs(
     }
 
 @router.get("/{catalog_id}")
-@rate_limit_products()
 def get_catalog(catalog_id: int, request: Request, db: Session = Depends(get_db)):
     catalog = db.query(Catalog).filter(Catalog.id == catalog_id).first()
     if not catalog:
