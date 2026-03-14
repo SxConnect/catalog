@@ -251,42 +251,43 @@ async def test_scrape(url: str = Query(..., description="URL to test scraping"))
 
 # Funções auxiliares
 def detect_product_page(soup, url):
-    """Detecta se é uma página de produto"""
+    """Detecta se é uma página de produto - otimizado para Cobasi"""
     try:
         indicators = [
+            # Padrão específico da Cobasi
+            'idsku=' in url.lower(),
+            '/p?' in url.lower(),
+            # Padrões genéricos
             '/produto/' in url.lower(),
             '/product/' in url.lower(),
             '/p/' in url.lower(),
             '/item/' in url.lower(),
+            # Elementos HTML
             soup.select_one('[itemprop="name"]') is not None,
             soup.select_one('[itemprop="price"]') is not None,
             soup.select_one('.product-price') is not None,
             soup.select_one('.add-to-cart') is not None,
             soup.select_one('.comprar') is not None,
+            # Elementos específicos da Cobasi
+            soup.select_one('[data-testid="product-name"]') is not None,
+            soup.select_one('[data-testid="price"]') is not None,
         ]
         return sum(indicators) >= 2
     except:
         return False
 
 def extract_product_links(soup, base_domain, current_url):
-    """Extrai links de produtos da página atual"""
+    """Extrai links de produtos da página atual - otimizado para Cobasi"""
     try:
         links = []
-        selectors = [
-            'a[href*="/produto/"]',
-            'a[href*="/product/"]',
-            'a[href*="/p/"]',
-            'a[href*="/item/"]',
-            '.product-item a',
-            '.produto a',
-            '.card-produto a',
-            '.product-card a'
-        ]
         
-        for selector in selectors:
-            elements = soup.select(selector)
-            for element in elements:
-                href = element.get('href')
+        # Método específico para Cobasi - procurar links com /p?idsku=
+        if 'cobasi.com.br' in current_url:
+            cobasi_links = soup.find_all('a', href=re.compile(r'/p\?idsku=\d+'))
+            logger.info(f"Found {len(cobasi_links)} Cobasi product links")
+            
+            for link in cobasi_links:
+                href = link.get('href')
                 if href:
                     if href.startswith('/'):
                         href = base_domain + href
@@ -296,8 +297,35 @@ def extract_product_links(soup, base_domain, current_url):
                     if href not in links:
                         links.append(href)
         
+        # Método genérico para outros sites
+        if not links:
+            selectors = [
+                'a[href*="/produto/"]',
+                'a[href*="/product/"]',
+                'a[href*="/p/"]',
+                'a[href*="/item/"]',
+                '.product-item a',
+                '.produto a',
+                '.card-produto a',
+                '.product-card a'
+            ]
+            
+            for selector in selectors:
+                elements = soup.select(selector)
+                for element in elements:
+                    href = element.get('href')
+                    if href:
+                        if href.startswith('/'):
+                            href = base_domain + href
+                        elif not href.startswith('http'):
+                            href = urljoin(current_url, href)
+                        
+                        if href not in links:
+                            links.append(href)
+        
         return links
-    except:
+    except Exception as e:
+        logger.error(f"Error extracting product links: {e}")
         return []
 
 async def extract_from_url(product_url, client, headers):
@@ -312,7 +340,7 @@ async def extract_from_url(product_url, client, headers):
         return None
 
 def extract_product_data(soup, url):
-    """Extrai dados completos do produto"""
+    """Extrai dados completos do produto - versão otimizada para Cobasi"""
     try:
         data = {
             'source_url': url,
@@ -322,11 +350,16 @@ def extract_product_data(soup, url):
             'description': None,
             'images': [],
             'category': None,
-            'ean': None
+            'sku': None
         }
         
+        # Extrair SKU da URL (específico para Cobasi)
+        sku_match = re.search(r'idsku=(\d+)', url)
+        if sku_match:
+            data['sku'] = sku_match.group(1)
+        
         # Nome do produto
-        name_selectors = ['h1', '.product-name', '.product-title', '[itemprop="name"]']
+        name_selectors = ['h1', '.product-name', '.product-title', '[itemprop="name"]', '[data-testid="product-name"]']
         for selector in name_selectors:
             elem = soup.select_one(selector)
             if elem:
@@ -335,8 +368,8 @@ def extract_product_data(soup, url):
                     data['name'] = name
                     break
         
-        # Marca
-        brand_selectors = ['[itemprop="brand"]', '.product-brand', '.brand-name']
+        # Marca - tentar extrair do nome se não encontrar elemento específico
+        brand_selectors = ['[itemprop="brand"]', '.product-brand', '.brand-name', '.marca']
         for selector in brand_selectors:
             elem = soup.select_one(selector)
             if elem:
@@ -346,12 +379,28 @@ def extract_product_data(soup, url):
                     data['brand'] = elem.get_text(strip=True)
                 break
         
+        # Se não encontrou marca, extrair da URL ou nome
         if not data['brand']:
-            domain = url.split('/')[2].replace('www.', '').split('.')[0]
-            data['brand'] = domain.upper()
+            if data['name']:
+                # Primeira palavra do nome geralmente é a marca
+                words = data['name'].split()
+                if len(words) > 1:
+                    data['brand'] = words[0]
+            else:
+                # Extrair da URL
+                domain = url.split('/')[2].replace('www.', '').split('.')[0]
+                data['brand'] = domain.upper()
         
-        # Preço
-        price_selectors = ['[itemprop="price"]', '.product-price', '.price', '.valor', '.preco']
+        # Preço - melhorado para Cobasi
+        price_selectors = [
+            '[itemprop="price"]', 
+            '.product-price', 
+            '.price', 
+            '.valor', 
+            '.preco',
+            '[data-testid="price"]'
+        ]
+        
         for selector in price_selectors:
             elem = soup.select_one(selector)
             if elem:
@@ -364,8 +413,21 @@ def extract_product_data(soup, url):
                     except:
                         continue
         
+        # Se não encontrou preço nos elementos, procurar no texto
+        if not data['price']:
+            price_texts = soup.find_all(string=re.compile(r'R\$\s*\d+[,.]?\d*'))
+            for text in price_texts:
+                price_match = re.search(r'R\$\s*([\d.,]+)', text)
+                if price_match:
+                    try:
+                        price_str = price_match.group(1).replace('.', '').replace(',', '.')
+                        data['price'] = float(price_str)
+                        break
+                    except:
+                        continue
+        
         # Descrição
-        desc_selectors = ['[itemprop="description"]', '.product-description', '.description']
+        desc_selectors = ['[itemprop="description"]', '.product-description', '.description', '.descricao']
         for selector in desc_selectors:
             elem = soup.select_one(selector)
             if elem:
@@ -377,13 +439,20 @@ def extract_product_data(soup, url):
                         data['description'] = desc[:500]
                 break
         
-        # Imagens
-        img_selectors = ['img[itemprop="image"]', '.product-image img', '.product-gallery img']
+        # Imagens - melhorado para Cobasi
+        img_selectors = [
+            'img[itemprop="image"]', 
+            '.product-image img', 
+            '.product-gallery img',
+            'img[src*="product"]',
+            'img[src*="produto"]'
+        ]
+        
         for selector in img_selectors:
             imgs = soup.select(selector)
             for img in imgs[:3]:
                 src = img.get('src') or img.get('data-src')
-                if src and 'placeholder' not in src.lower():
+                if src and 'placeholder' not in src.lower() and 'loading' not in src.lower():
                     if not src.startswith('http'):
                         src = urljoin(url, src)
                     if src not in data['images']:
